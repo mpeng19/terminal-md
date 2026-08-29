@@ -27,13 +27,13 @@ func TestLatexToUnicode(t *testing.T) {
 		{"sup fallback single", `x^q`, "x^q"},
 		{"sub expression", `x_{n+1}`, "xₙ₊₁"},
 		{"sub fallback", `T_{cd}`, "T_(cd)"},
-		{"sum limits", `\sum_{i=1}^{n} i`, "∑ᵢ₌₁ⁿ i"},
+		{"sum limits", `\sum_{i=1}^{n} i`, "∑ⁿᵢ₌₁ i"},
 		{"integral limits", `\int_0^1 f(x)\,dx`, "∫₀¹ f(x) dx"},
 		{"lim fallback", `\lim_{x \to 0} \sin x`, "lim_(x → 0) sin x"},
 		{"degrees", `90^\circ`, "90°"},
 		{"log base", `\log_2 n`, "log₂ n"},
 		{"sup star", `x^*`, "x*"},
-		{"sup infinity", `\sum_{k=0}^{\infty} \frac{x^k}{k!}`, "∑ₖ₌₀^∞ xᵏ/(k!)"},
+		{"sup infinity", `\sum_{k=0}^{\infty} \frac{x^k}{k!}`, "∑^∞ₖ₌₀ xᵏ/(k!)"},
 		{"euler", `e^{i\pi} + 1 = 0`, "e^(iπ) + 1 = 0"},
 		{"greek scripts", `\alpha^2 + \beta_1`, "α² + β₁"},
 		{"sequence", `x_1, x_2, \ldots, x_n`, "x₁, x₂, …, xₙ"},
@@ -176,7 +176,7 @@ func TestConvertMath(t *testing.T) {
 		{"display single line", "Intro\n$$E = mc^2$$\nOutro\n",
 			"Intro\n\n```math\nE = mc²\n```\n\nOutro\n"},
 		{"display multi line", "Intro\n$$\n\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}\n$$\nOutro\n",
-			"Intro\n\n```math\n∑ᵢ₌₁ⁿ i = (n(n+1))/2\n```\n\nOutro\n"},
+			"Intro\n\n```math\n n\n ∑ i = (n(n+1))/2\ni=1\n```\n\nOutro\n"},
 		{"display brackets", "A\n\\[x^2\\]\nB\n", "A\n\n```math\nx²\n```\n\nB\n"},
 		{"display already spaced", "A\n\n$$x$$\n\nB\n", "A\n\n```math\nx\n```\n\nB\n"},
 		{"display at end no newline", "A\n$$x$$", "A\n\n```math\nx\n```\n"},
@@ -265,5 +265,47 @@ func TestConvertMathStopsAtCodeSpans(t *testing.T) {
 	in = "price $10, then $x$ later, and `a $ b`"
 	if got, want := convertMath(in), "price $10, then x later, and `a $ b`"; got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestBigOperatorLimits(t *testing.T) {
+	cases := map[string]string{
+		`\sum_{i=1}^{n} x_i`:  "∑ⁿᵢ₌₁ xᵢ",
+		`\sum^{n}_{i=1} x_i`:  "∑ⁿᵢ₌₁ xᵢ",
+		`\int_0^1 f`:          "∫₀¹ f", // short lower limit keeps the usual order
+		`x_{ij}^2`:            "xᵢⱼ²",  // not a big operator
+		`\lim_{x \to 0} f(x)`: "lim_(x → 0) f(x)",
+	}
+	for in, want := range cases {
+		if got := latexToUnicode(in); got != want {
+			t.Errorf("latexToUnicode(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestStackLimits(t *testing.T) {
+	got := stackLimits("∑ⁿᵢ₌₁ i = (n(n+1))/2")
+	want := []string{
+		" n",
+		" ∑ i = (n(n+1))/2",
+		"i=1",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	got = stackLimits("∫₀¹ f(x) dx + ∏_(k=1)^N a_k")
+	want = []string{
+		"1           N",
+		"∫ f(x) dx + ∏ a_k",
+		"0          k=1",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if got := stackLimits("x² + y²"); len(got) != 1 || got[0] != "x² + y²" {
+		t.Errorf("lines without big operators must be unchanged, got %q", got)
+	}
+	if out := convertMath("$$\\sum_{i=1}^{n} i$$"); !strings.Contains(out, " n\n ∑ i\ni=1") {
+		t.Errorf("display math should stack limits, got %q", out)
 	}
 }

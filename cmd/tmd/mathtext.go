@@ -360,7 +360,9 @@ func appendDisplayMath(out []byte, segStart int, s string, start int, tex string
 	}
 	out = append(out, indent+"```math\n"...)
 	for _, line := range strings.Split(latexToUnicode(tex), "\n") {
-		out = append(out, indent+line+"\n"...)
+		for _, l := range stackLimits(line) {
+			out = append(out, indent+l+"\n"...)
+		}
 	}
 	out = append(out, indent+"```\n\n"...)
 
@@ -490,7 +492,28 @@ func renderTexNode(b *strings.Builder, nodes []texNode, i int) int {
 			writeSpace(b)
 		case "^", "_":
 			arg, next := texArg(nodes, i+1)
-			writeScript(b, n.text, renderTex(arg))
+			first := renderTex(arg)
+			// A paired script (x_a^b or x^b_a) on a big operator: put the
+			// upper limit first when the lower one is long, so ∑_{i=1}^n
+			// becomes ∑ⁿᵢ₌₁ rather than ∑ᵢ₌₁ⁿ, which reads as "1ⁿ".
+			if j := skipTexSpaces(nodes, next); j < len(nodes) && nodes[j].kind == texChar &&
+				(nodes[j].text == "^" || nodes[j].text == "_") && nodes[j].text != n.text {
+				arg2, next2 := texArg(nodes, j+1)
+				second := renderTex(arg2)
+				sub, sup := first, second
+				if n.text == "^" {
+					sub, sup = second, first
+				}
+				if endsWithBigOp(b.String()) && utf8.RuneCountInString(sub) > 1 {
+					writeScript(b, "^", sup)
+					writeScript(b, "_", sub)
+				} else {
+					writeScript(b, n.text, first)
+					writeScript(b, nodes[j].text, second)
+				}
+				return next2
+			}
+			writeScript(b, n.text, first)
 			return next
 		default:
 			b.WriteString(n.text)
@@ -1006,4 +1029,29 @@ var texSubscripts = map[rune]rune{
 	'a': 'ₐ', 'e': 'ₑ', 'h': 'ₕ', 'i': 'ᵢ', 'j': 'ⱼ', 'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ',
 	'o': 'ₒ', 'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ', 'v': 'ᵥ', 'x': 'ₓ',
 	'β': 'ᵦ', 'γ': 'ᵧ', 'ρ': 'ᵨ', 'φ': 'ᵩ', 'χ': 'ᵪ',
+}
+
+// bigOps are operators whose limits sit above and below in display math.
+var bigOps = map[rune]bool{'∑': true, '∏': true, '∐': true, '∫': true, '∬': true, '∭': true,
+	'∮': true, '⋃': true, '⋂': true, '⨁': true, '⨂': true, '⨆': true, '⋁': true, '⋀': true}
+
+var bigOpWords = []string{"lim", "max", "min", "sup", "inf", "argmax", "argmin"}
+
+// endsWithBigOp reports whether s ends with a big operator (optionally
+// followed by spaces).
+func endsWithBigOp(s string) bool {
+	s = strings.TrimRight(s, " ")
+	if s == "" {
+		return false
+	}
+	r, _ := utf8.DecodeLastRuneInString(s)
+	if bigOps[r] {
+		return true
+	}
+	for _, w := range bigOpWords {
+		if strings.HasSuffix(s, w) {
+			return true
+		}
+	}
+	return false
 }

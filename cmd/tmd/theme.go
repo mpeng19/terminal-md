@@ -105,6 +105,7 @@ func loadTheme(name string, dark bool, overrides map[string]string) (theme, erro
 			if name != "notty" && name != "ascii" {
 				cleanHeadings(&th.styles) // plain text keeps its '#' markers
 			}
+			fixGlyphs(&th.styles)
 			break
 		}
 		data, err := os.ReadFile(name)
@@ -128,6 +129,7 @@ func baseTheme(name string, dark bool) theme {
 		cfg = styles.DarkStyleConfig
 	}
 	cleanHeadings(&cfg)
+	fixGlyphs(&cfg)
 	return theme{name: name, styles: cfg, chrome: defaultChrome()}
 }
 
@@ -151,6 +153,12 @@ func cleanHeadings(cfg *ansi.StyleConfig) {
 	cfg.H6.Bold = &f
 	cfg.H6.Italic = &t
 	cfg.H6.Faint = &t
+}
+
+// fixGlyphs replaces characters glamour uses that many terminal fonts lack
+// (the definition-list arrow is from Supplemental Arrows-C) with common ones.
+func fixGlyphs(cfg *ansi.StyleConfig) {
+	cfg.DefinitionDescription.BlockPrefix = strings.ReplaceAll(cfg.DefinitionDescription.BlockPrefix, "🠶", "→")
 }
 
 // apply sets the colors named in overrides (see colorKeys) on the theme.
