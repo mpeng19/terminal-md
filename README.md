@@ -28,17 +28,29 @@ scrollback and prompt come back untouched.
 
 ## Install
 
-Requires Go 1.24+ (older `go` binaries download the right toolchain
-automatically when `GOTOOLCHAIN=auto`, which is the default).
+Tested on macOS and Linux (it compiles for Windows, but the terminal
+behaviour there is untested).
+
+With Go 1.24+ (older `go` binaries download the right toolchain automatically):
 
 ```sh
-git clone https://github.com/michaelpeng/terminal-md
+go install github.com/mpeng19/terminal-md/cmd/tmd@latest
+```
+
+Or grab a prebuilt binary for macOS, Linux or Windows from the
+[releases page](https://github.com/mpeng19/terminal-md/releases) and put
+`tmd` somewhere on your `PATH`.
+
+From a clone:
+
+```sh
+git clone https://github.com/mpeng19/terminal-md
 cd terminal-md
 go install ./cmd/tmd   # or: make install
 ```
 
-This puts `tmd` in `$(go env GOPATH)/bin` (usually `~/go/bin`). Make sure that
-directory is on your `PATH`:
+`go install` puts `tmd` in `$(go env GOPATH)/bin` (usually `~/go/bin`). Make
+sure that directory is on your `PATH`:
 
 ```sh
 export PATH="$PATH:$(go env GOPATH)/bin"
@@ -114,8 +126,8 @@ the view starts to move. Capturing the mouse disables the terminal's
 native text selection, so press **`v`** to enter *select mode*: the mouse is
 released, `SELECT` shows in the footer, and you can drag to select and copy
 as usual (in tmux with `mouse on`, that's copy-on-release). Press `v` again
-to resume wheel scrolling. Many terminals also let you bypass capture by
-holding a modifier while dragging (Shift in most, Option in iTerm2).
+to resume wheel scrolling. Many terminals also let you bypass mouse capture
+by holding a modifier key while dragging.
 
 Run with `--no-mouse` (or `mouse = false` in the config) if you never want
 the mouse captured; the wheel then only scrolls if your terminal or tmux
@@ -241,3 +253,7 @@ make build     # builds ./tmd
 make install   # go install
 ./tmd examples/demo.md
 ```
+
+## License
+
+[MIT](LICENSE)

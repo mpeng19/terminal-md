@@ -40,7 +40,7 @@ func main() {
 ```
 
 ```sh
-go install github.com/michaelpeng/terminal-md/cmd/tmd@latest
+go install github.com/mpeng19/terminal-md/cmd/tmd@latest
 tmd README.md
 ```
 

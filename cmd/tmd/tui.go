@@ -752,6 +752,12 @@ func trimBlankLines(s string) string {
 
 // compose rebuilds the viewport content from the blocks, keeping the cursor
 // on the same block and line.
+//
+// TODO(perf): this rebuilds the whole content string on every keystroke and
+// cursor move. Block rendering is cached, so it's fine for READMEs and notes,
+// but a document of many thousands of lines will start to lag; composing
+// incrementally (only the changed block, or only the visible window) would
+// fix that.
 func (m *model) compose() {
 	blk, off := m.cursorBlock(), m.cursorOffset()
 

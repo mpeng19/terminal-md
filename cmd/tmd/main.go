@@ -147,15 +147,16 @@ Config:
   run 'tmd --init-config' to create one with the defaults spelled out.
 
 Keys (defaults):
-  j / k     next/prev block         ↑ / ↓       move a line
-  space/f, b  page                  ctrl+d/u    half page
-  ctrl+e/y  scroll a line
-  g / G     top/end    ←/h →/l     sideways   r         reload
-  i / enter edit block a  edit at end          o / O     new block below/above
-  dd        delete     u / ctrl+z  undo       ctrl+r    redo
-  ctrl+s    save       v           select mode (releases the mouse)
-  q         quit
-  In the editor: esc finishes, ctrl+s saves, ctrl+z / ctrl+r undo / redo.
+  j / k         next / previous block     ↑ / ↓         move a line
+  space / b     page down / up            ctrl+d / u    half page down / up
+  ctrl+e / y    scroll a line             h / l, ← / →  scroll sideways
+  g / G         top / bottom              r             reload from disk
+  i / enter     edit block                a             edit block, cursor at end
+  o / O         new block below / above   dd            delete block
+  u / ctrl+z    undo                      ctrl+r        redo
+  ctrl+s        save                      v             select mode (releases the mouse)
+  q / ctrl+c    quit
+  While editing: esc finishes, ctrl+s saves, ctrl+z / ctrl+r undo / redo.
 `, version, themeNames(), defaultSize, defaultMinWidth, defaultMinHeight, defaultConfigPath())
 }
 

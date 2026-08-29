@@ -1,4 +1,4 @@
-module github.com/michaelpeng/terminal-md
+module github.com/mpeng19/terminal-md
 
 go 1.24.2
 

@@ -37,7 +37,6 @@ const (
 	actSave      action = "save"
 	actSelect    action = "select"
 	actDone      action = "done"
-	actCancelKey action = "cancel" // internal: clears a pending chord/confirmation
 )
 
 // bindings maps actions to the key sequences that trigger them. A sequence
