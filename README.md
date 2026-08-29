@@ -74,11 +74,14 @@ Options:
 
 `tmd` is modal, like vim: you start in **normal** mode, where a bar in the
 left margin marks the current block (a paragraph, heading, list, code block…).
+Moving the cursor keeps that block near the middle of the box, so reading
+through a document feels like scrolling.
 
 | Normal mode          | Action                                   |
 |----------------------|------------------------------------------|
-| `j` / `k`            | move the cursor a line                   |
-| `↓` / `↑`            | scroll the view a line (what the wheel sends) |
+| `j` / `k`            | next / previous block                    |
+| `↓` / `↑`            | move the cursor a line                   |
+| `ctrl+e` / `ctrl+y`  | scroll the view a line                   |
 | `space` / `f`, `b`   | page down / up                           |
 | `ctrl+d` / `ctrl+u`  | half page down / up                      |
 | `g` / `G`            | top / bottom                             |

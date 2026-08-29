@@ -334,6 +334,10 @@ func (m model) do(act action) (tea.Model, tea.Cmd) {
 		m.moveCursor(1)
 	case actUp:
 		m.moveCursor(-1)
+	case actNextBlock:
+		m.moveBlock(1)
+	case actPrevBlock:
+		m.moveBlock(-1)
 	case actScrollDn:
 		m.vp.ScrollDown(1)
 		m.clampCursorToView()
@@ -431,6 +435,9 @@ func (m model) do(act action) (tea.Model, tea.Cmd) {
 	m.compose()
 	switch act {
 	case actScrollDn, actScrollUp, actPageDown, actPageUp, actHalfDown, actHalfUp, actTop, actBottom, actLeft, actRight:
+		// The view moved; the cursor was clamped into it already.
+	case actDown, actUp, actNextBlock, actPrevBlock, actDelete, actUndo, actRedo:
+		m.centerCursor()
 	default:
 		m.scrollToCursor()
 	}
@@ -505,7 +512,7 @@ func (m *model) finishEdit() {
 	m.compose()
 	m.setCursor(m.editIdx, row)
 	m.compose()
-	m.scrollToCursor()
+	m.centerCursor()
 }
 
 // fitTextarea sizes the editor to show all of its (wrapped) lines.
@@ -814,6 +821,17 @@ func (m *model) moveCursor(n int) {
 // scrollToCursor scrolls the viewport just enough to show the cursor line.
 func (m *model) scrollToCursor() { m.ensureVisible(m.cursor) }
 
+// centerCursor scrolls so the cursor line sits in the middle of the view
+// (as far as the document's ends allow), so moving through the document
+// reads like scrolling rather than the cursor drifting to an edge.
+func (m *model) centerCursor() { m.vp.SetYOffset(m.cursor - m.vp.Height/2) }
+
+// moveBlock moves the cursor to the first line of the block n blocks away.
+func (m *model) moveBlock(n int) {
+	blk := min(max(m.cursorBlock()+n, 0), len(m.blockStart)-1)
+	m.setCursor(blk, 0)
+}
+
 func (m *model) ensureVisible(line int) {
 	if line < m.vp.YOffset {
 		m.vp.SetYOffset(line)
@@ -822,23 +840,21 @@ func (m *model) ensureVisible(line int) {
 	}
 }
 
-// clampCursorToView moves the cursor into the visible area after the
-// viewport was scrolled independently of it.
+// clampCursorToView moves the cursor onto the block line nearest the middle
+// of the view when scrolling has left it off screen.
 func (m *model) clampCursorToView() {
 	top, bottom := m.vp.YOffset, m.vp.YOffset+m.vp.Height-1
 	if m.cursor >= top && m.cursor <= bottom {
 		return
 	}
-	i, dir := top, 1
-	if m.cursor > bottom {
-		i, dir = bottom, -1
-	}
-	for i >= 0 && i < len(m.refs) && i >= top && i <= bottom {
-		if m.refs[i].block >= 0 {
-			m.cursor = i
-			return
+	center := (top + bottom) / 2
+	for d := 0; center-d >= top || center+d <= bottom; d++ {
+		for _, i := range []int{center - d, center + d} {
+			if i >= top && i <= bottom && i < len(m.refs) && m.refs[i].block >= 0 {
+				m.cursor = i
+				return
+			}
 		}
-		i += dir
 	}
 }
 

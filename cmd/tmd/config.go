@@ -227,10 +227,12 @@ variant = "auto"
 # "end", "pgup"/"pgdown", "ctrl+x", "alt+x", "f1".
 [keys]
 quit      = ["q", "ctrl+c"]
-down        = ["j"]        # move the cursor
-up          = ["k"]
-scroll_down = ["down"]     # scroll the view (this is what the mouse wheel sends)
-scroll_up   = ["up"]
+next_block  = ["j"]        # move the cursor a whole block
+prev_block  = ["k"]
+down        = ["down"]     # move the cursor a single line
+up          = ["up"]
+scroll_down = ["ctrl+e"]   # scroll the view a line without moving the cursor
+scroll_up   = ["ctrl+y"]
 page_down = ["space", "f", "pgdown"]
 page_up   = ["b", "pgup"]
 half_down = ["ctrl+d"]

@@ -88,7 +88,7 @@ done = ["esc", "ctrl+g"]
 	if got := km.insert[actDone]; len(got) != 2 || got[1] != "ctrl+g" {
 		t.Errorf("insert.done = %v", got)
 	}
-	if got := km.normal[actScrollDn]; len(got) != 1 || got[0] != "down" {
+	if got := km.normal[actScrollDn]; len(got) != 1 || got[0] != "ctrl+e" {
 		t.Errorf("unmentioned actions should keep defaults, scroll_down = %v", got)
 	}
 	if act, _ := km.normal.resolve([]string{"ctrl+x"}); act != actDelete {

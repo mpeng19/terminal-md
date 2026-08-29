@@ -12,9 +12,11 @@ type action string
 const (
 	actNone      action = ""
 	actQuit      action = "quit"
-	actDown      action = "down"
+	actDown      action = "down" // cursor one line
 	actUp        action = "up"
-	actScrollDn  action = "scroll_down"
+	actNextBlock action = "next_block" // cursor one block
+	actPrevBlock action = "prev_block"
+	actScrollDn  action = "scroll_down" // view one line, cursor stays
 	actScrollUp  action = "scroll_up"
 	actPageDown  action = "page_down"
 	actPageUp    action = "page_up"
@@ -51,29 +53,31 @@ type keymap struct {
 func defaultKeymap() keymap {
 	return keymap{
 		normal: bindings{
-			actQuit:     {"q", "ctrl+c"},
-			actDown:     {"j"},
-			actUp:       {"k"},
-			actScrollDn: {"down"},
-			actScrollUp: {"up"},
-			actPageDown: {"space", "f", "pgdown"},
-			actPageUp:   {"b", "pgup"},
-			actHalfDown: {"ctrl+d"},
-			actHalfUp:   {"ctrl+u"},
-			actTop:      {"g", "home"},
-			actBottom:   {"G", "end"},
-			actLeft:     {"h", "left"},
-			actRight:    {"l", "right"},
-			actReload:   {"r"},
-			actEdit:     {"i", "enter"},
-			actAppend:   {"a"},
-			actNewBelow: {"o"},
-			actNewAbove: {"O"},
-			actDelete:   {"d d"},
-			actUndo:     {"u", "ctrl+z"},
-			actRedo:     {"ctrl+r"},
-			actSave:     {"ctrl+s"},
-			actSelect:   {"v"},
+			actQuit:      {"q", "ctrl+c"},
+			actDown:      {"down"},
+			actUp:        {"up"},
+			actNextBlock: {"j"},
+			actPrevBlock: {"k"},
+			actScrollDn:  {"ctrl+e"},
+			actScrollUp:  {"ctrl+y"},
+			actPageDown:  {"space", "f", "pgdown"},
+			actPageUp:    {"b", "pgup"},
+			actHalfDown:  {"ctrl+d"},
+			actHalfUp:    {"ctrl+u"},
+			actTop:       {"g", "home"},
+			actBottom:    {"G", "end"},
+			actLeft:      {"h", "left"},
+			actRight:     {"l", "right"},
+			actReload:    {"r"},
+			actEdit:      {"i", "enter"},
+			actAppend:    {"a"},
+			actNewBelow:  {"o"},
+			actNewAbove:  {"O"},
+			actDelete:    {"d d"},
+			actUndo:      {"u", "ctrl+z"},
+			actRedo:      {"ctrl+r"},
+			actSave:      {"ctrl+s"},
+			actSelect:    {"v"},
 		},
 		insert: bindings{
 			actDone: {"esc"},

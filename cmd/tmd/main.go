@@ -147,8 +147,9 @@ Config:
   run 'tmd --init-config' to create one with the defaults spelled out.
 
 Keys (defaults):
-  j / k     move       ↑ / ↓       scroll     space/f, b  page
-  ctrl+d/u  half page
+  j / k     next/prev block         ↑ / ↓       move a line
+  space/f, b  page                  ctrl+d/u    half page
+  ctrl+e/y  scroll a line
   g / G     top/end    ←/h →/l     sideways   r         reload
   i / enter edit block a  edit at end          o / O     new block below/above
   dd        delete     u / ctrl+z  undo       ctrl+r    redo
