@@ -87,6 +87,7 @@ type model struct {
 
 	pending []string // keys of a partially typed chord
 	confirm action   // action awaiting a second key press to confirm
+	mouseOn bool     // whether the mouse is currently captured
 
 	notice      string
 	noticeErr   bool
@@ -104,8 +105,9 @@ func newModel(src source, data []byte, opts options, th theme, keys keymap) mode
 	}
 	m.vp = viewport.New(0, 0)
 	m.vp.KeyMap = viewport.KeyMap{} // keys are handled by the model
-	m.vp.MouseWheelEnabled = opts.mouse
+	m.vp.MouseWheelEnabled = true
 	m.vp.SetHorizontalStep(hScrollStep)
+	m.mouseOn = opts.mouse
 	return m
 }
 
@@ -231,6 +233,19 @@ func (m *model) load(data []byte, mod time.Time) {
 
 func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := keyName(msg)
+
+	// Esc followed quickly by another key reaches us as alt+key (tmux and
+	// some terminals wait for a possible escape sequence). Treat it as vim
+	// does: leave insert mode, then handle the key.
+	if msg.Alt && msg.Type == tea.KeyRunes {
+		msg.Alt = false
+		key = keyName(msg)
+		if m.mode == modeInsert {
+			if act, _ := m.keys.insert.resolve([]string{"esc"}); act == actDone {
+				m.finishEdit()
+			}
+		}
+	}
 
 	if m.mode == modeInsert {
 		act, _ := m.keys.insert.resolve([]string{key})
@@ -402,6 +417,15 @@ func (m model) do(act action) (tea.Model, tea.Cmd) {
 		m.redo = m.redo[:len(m.redo)-1]
 	case actSave:
 		m.save()
+	case actSelect:
+		m.mouseOn = !m.mouseOn
+		m.compose()
+		if m.mouseOn {
+			m.setNotice("mouse scrolling resumed", false)
+			return m, tea.EnableMouseCellMotion
+		}
+		m.setNotice("select mode: drag to select and copy, "+m.keys.normal.firstKey(actSelect)+" to resume mouse scrolling", false)
+		return m, tea.DisableMouse
 	}
 
 	m.compose()
@@ -930,9 +954,16 @@ func (m model) bottomBorder(inner int) string {
 	}
 	left := "─ " + pct + " "
 	leftStyled := m.th.chrome.border.Render("─ ") + m.th.chrome.dim.Render(pct) + m.th.chrome.border.Render(" ")
-	if m.mode == modeInsert {
-		left = "─ INSERT · " + pct + " "
-		leftStyled = m.th.chrome.border.Render("─ ") + m.th.chrome.insert.Render("INSERT") + m.th.chrome.border.Render(" · ") + m.th.chrome.dim.Render(pct) + m.th.chrome.border.Render(" ")
+	tag := ""
+	switch {
+	case m.mode == modeInsert:
+		tag = "INSERT"
+	case !m.mouseOn && m.opts.mouse:
+		tag = "SELECT"
+	}
+	if tag != "" {
+		left = "─ " + tag + " · " + pct + " "
+		leftStyled = m.th.chrome.border.Render("─ ") + m.th.chrome.insert.Render(tag) + m.th.chrome.border.Render(" · ") + m.th.chrome.dim.Render(pct) + m.th.chrome.border.Render(" ")
 	}
 
 	var right, rightStyled string
@@ -978,9 +1009,12 @@ func (m model) hints() []string {
 		return []string{k(b, actDone) + " done", k(b, actSave) + " save", k(b, actUndo) + " undo", k(b, actRedo) + " redo"}
 	}
 	b := m.keys.normal
+	if !m.mouseOn && m.opts.mouse {
+		return []string{k(b, actSelect) + " resume mouse", k(b, actQuit) + " quit"}
+	}
 	return []string{
 		k(b, actEdit) + " edit", k(b, actNewBelow) + " new", k(b, actDelete) + " delete",
-		k(b, actUndo) + " undo", k(b, actSave) + " save", k(b, actQuit) + " quit",
+		k(b, actUndo) + " undo", k(b, actSave) + " save", k(b, actSelect) + " select", k(b, actQuit) + " quit",
 	}
 }
 

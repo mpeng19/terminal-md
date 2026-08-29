@@ -61,8 +61,8 @@ Options:
                            is (default: 100)
       --min-height <rows>  box is never shorter than this, unless the terminal
                            is (default: 30)
-      --mouse              capture the mouse so the wheel scrolls natively
-                           (off by default so you can select and copy text)
+      --no-mouse           don't capture the mouse (press v in the app to
+                           release it temporarily instead)
       --no-watch           don't re-render when the file changes on disk
       --config <path>      config file (default: ~/.config/tmd/config.toml)
       --init-config        write a commented default config file and exit
@@ -90,12 +90,13 @@ left margin marks the current block (a paragraph, heading, list, code block…).
 | `u` / `ctrl+z`       | undo                                     |
 | `ctrl+r`             | redo                                     |
 | `ctrl+s`             | save                                     |
+| `v`                  | select mode: release / recapture the mouse |
 | `r`                  | reload from disk                         |
 | `q` / `ctrl+c`       | quit (asks first if there are unsaved changes) |
 
 | Insert mode          | Action                                   |
 |----------------------|------------------------------------------|
-| `esc`                | finish editing (re-renders the block)    |
+| `esc`                | finish editing (re-renders the block); `esc` + a key in quick succession works too |
 | `ctrl+s`             | save                                     |
 | `ctrl+z` / `ctrl+r`  | undo / redo typing                       |
 | `ctrl+a` / `ctrl+e`  | start / end of line                      |
@@ -103,13 +104,16 @@ left margin marks the current block (a paragraph, heading, list, code block…).
 
 ### Mouse, scrolling and copying
 
-`tmd` doesn't capture the mouse by default, so you can select and copy text
-the way you always do — in tmux with `mouse on` that means drag to select and
-it's copied on release. The wheel still works: terminals (iTerm2, Terminal.app,
-kitty, Alacritty, WezTerm…) and tmux translate wheel movement into `↑`/`↓` for
-full-screen apps, which scroll the view. Pass `--mouse` (or set
-`mouse = true` in the config) if you'd rather have native wheel scrolling
-and don't need selection.
+The mouse wheel scrolls the box. Capturing the mouse disables the terminal's
+native text selection, so press **`v`** to enter *select mode*: the mouse is
+released, `SELECT` shows in the footer, and you can drag to select and copy
+as usual (in tmux with `mouse on`, that's copy-on-release). Press `v` again
+to resume wheel scrolling. Many terminals also let you bypass capture by
+holding a modifier while dragging (Shift in most, Option in iTerm2).
+
+Run with `--no-mouse` (or `mouse = false` in the config) if you never want
+the mouse captured; the wheel then only scrolls if your terminal or tmux
+turns it into `↑`/`↓` for full-screen apps.
 
 ### Editing
 

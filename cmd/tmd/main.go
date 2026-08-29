@@ -132,10 +132,10 @@ Options:
                            is (default: %d)
       --min-height <rows>  box is never shorter than this, unless the terminal
                            is (default: %d)
-      --mouse              capture the mouse so the wheel scrolls natively.
-                           Off by default so you can select and copy text;
-                           most terminals (and tmux with 'mouse on') turn
-                           the wheel into arrow keys anyway
+      --no-mouse           don't capture the mouse (the wheel then only works
+                           if the terminal turns it into arrow keys). With
+                           the mouse captured, press v to release it and
+                           select text, v again to resume
       --no-watch           don't re-render when the file changes on disk
       --config <path>      config file (default: %s)
       --init-config        write a commented default config file and exit
@@ -152,7 +152,8 @@ Keys (defaults):
   g / G     top/end    ←/h →/l     sideways   r         reload
   i / enter edit block a  edit at end          o / O     new block below/above
   dd        delete     u / ctrl+z  undo       ctrl+r    redo
-  ctrl+s    save       q           quit
+  ctrl+s    save       v           select mode (releases the mouse)
+  q         quit
   In the editor: esc finishes, ctrl+s saves, ctrl+z / ctrl+r undo / redo.
 `, version, themeNames(), defaultSize, defaultMinWidth, defaultMinHeight, defaultConfigPath())
 }
@@ -162,7 +163,7 @@ Keys (defaults):
 // fill in the rest.
 func parseArgs() (options, string, map[string]bool) {
 	opts := options{style: "auto", size: defaultSize, minW: defaultMinWidth, minH: defaultMinHeight,
-		mouse: false, watch: true, config: defaultConfigPath()}
+		mouse: true, watch: true, config: defaultConfigPath()}
 	set := map[string]bool{}
 	initConfig := false
 	var positional []string

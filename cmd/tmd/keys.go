@@ -33,6 +33,7 @@ const (
 	actUndo      action = "undo"
 	actRedo      action = "redo"
 	actSave      action = "save"
+	actSelect    action = "select"
 	actDone      action = "done"
 	actCancelKey action = "cancel" // internal: clears a pending chord/confirmation
 )
@@ -72,6 +73,7 @@ func defaultKeymap() keymap {
 			actUndo:     {"u", "ctrl+z"},
 			actRedo:     {"ctrl+r"},
 			actSave:     {"ctrl+s"},
+			actSelect:   {"v"},
 		},
 		insert: bindings{
 			actDone: {"esc"},

@@ -200,10 +200,9 @@ size = 0.75
 # The box never gets smaller than this, unless the terminal is.
 min_width = 100
 min_height = 30
-# Capture the mouse so the wheel scrolls natively. Off by default so you can
-# select and copy text; terminals (and tmux with 'mouse on') turn the wheel
-# into arrow keys in full-screen apps anyway, which scroll the view.
-mouse = false
+# Capture the mouse so the wheel scrolls the box. Press v (the "select"
+# action) to release it when you want to select and copy text.
+mouse = true
 # Re-render when the file changes on disk.
 watch = true
 
@@ -249,6 +248,7 @@ delete    = ["d d"]
 undo      = ["u", "ctrl+z"]
 redo      = ["ctrl+r"]
 save      = ["ctrl+s"]
+select    = ["v"]          # release / recapture the mouse for text selection
 
 # Keys while editing a block. Everything else is typed into the block.
 [keys.insert]
