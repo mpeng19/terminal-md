@@ -140,6 +140,25 @@ inside the editor split it into several blocks; an emptied block is removed.
   rendered Markdown is printed instead of opening the box, using the `notty`
   style unless one is given explicitly.
 
+## What renders
+
+Everything glamour handles — headings (ATX and setext), emphasis, links,
+images, nested and task lists, definition lists, block quotes, fenced and
+indented code with syntax highlighting, tables with alignment, HTML,
+emoji shortcodes — plus a few things it doesn't:
+
+- **Math.** LaTeX in `$…$`, `$$…$$`, `\(…\)` and `\[…\]` is converted to
+  Unicode: `$e^{i\pi} + 1 = 0$` → e^(iπ) + 1 = 0, `$\sum_{i=1}^{n} x_i$` →
+  ∑ᵢ₌₁ⁿ xᵢ, `\frac{1}{2}` → ½, `\sqrt{x^2+y^2}` → √(x² + y²), Greek letters,
+  operators, arrows, `\mathbb{R}` → ℝ, accents, `cases`/`aligned`/matrix
+  environments. Display math is set off as its own block. Dollar amounts
+  (`$5 and $10`) and anything in code are left alone.
+- **Footnotes.** `[^1]` references and `[^1]:` definitions become
+  superscripts.
+- **YAML front matter** at the top of a file is shown as a `yaml` block.
+
+`examples/kitchen-sink.md` exercises all of it.
+
 ## Configuration
 
 Everything above — window size, theme, colors and every key binding — can be

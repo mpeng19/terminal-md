@@ -30,6 +30,16 @@ func parseDocument(src string) document {
 	}
 
 	i := 0
+	// YAML front matter at the very start of the file is one block.
+	if n := frontMatterEnd(lines); n > 0 {
+		b := block{src: strings.Join(lines[:n], "\n")}
+		i = n
+		for i < len(lines) && isBlank(lines[i]) {
+			b.blank++
+			i++
+		}
+		d.blocks = append(d.blocks, b)
+	}
 	for i < len(lines) && isBlank(lines[i]) {
 		d.leading++
 		i++
@@ -72,8 +82,11 @@ func (d document) String() string {
 		}
 	}
 	var sb strings.Builder
-	sb.WriteString(strings.Repeat("\n", d.leading))
+	fm := d.hasFrontMatter()
 	for i, b := range d.blocks {
+		if (i == 0 && !fm) || (i == 1 && fm) {
+			sb.WriteString(strings.Repeat("\n", d.leading))
+		}
 		if b.src == "" {
 			continue
 		}
@@ -84,6 +97,12 @@ func (d document) String() string {
 		sb.WriteString(strings.Repeat("\n", b.blank))
 	}
 	return sb.String()
+}
+
+// hasFrontMatter reports whether block 0 is YAML front matter (which is
+// only possible at the very start of the file).
+func (d document) hasFrontMatter() bool {
+	return d.leading == 0 && len(d.blocks) > 0 && isFrontMatter(d.blocks[0].src)
 }
 
 func (d document) clone() document {
@@ -158,6 +177,33 @@ func (d *document) splice(i, n int, repl ...block) {
 }
 
 func isBlank(line string) bool { return strings.TrimSpace(line) == "" }
+
+// frontMatterEnd returns the number of lines taken up by YAML front matter
+// ("---" on the first line, closed by "---" or "..."), or 0 if there is none.
+func frontMatterEnd(lines []string) int {
+	if len(lines) < 2 || strings.TrimRight(lines[0], " ") != "---" {
+		return 0
+	}
+	for j := 1; j < len(lines); j++ {
+		if t := strings.TrimRight(lines[j], " "); t == "---" || t == "..." {
+			return j + 1
+		}
+	}
+	return 0
+}
+
+// isFrontMatter reports whether src is a front matter block.
+func isFrontMatter(src string) bool {
+	lines := strings.Split(src, "\n")
+	return frontMatterEnd(lines) == len(lines)
+}
+
+// frontMatterAsCode rewrites a front matter block as a yaml code block so it
+// renders legibly instead of as a horizontal rule plus prose.
+func frontMatterAsCode(src string) string {
+	lines := strings.Split(src, "\n")
+	return "```yaml\n" + strings.Join(lines[1:len(lines)-1], "\n") + "\n```"
+}
 
 func isFenced(src string) bool {
 	first, _, _ := strings.Cut(src, "\n")

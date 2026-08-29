@@ -307,7 +307,12 @@ func renderPlain(data []byte, style string, colors map[string]string) error {
 	if err != nil {
 		return err
 	}
-	out, err := r.Render(string(data))
+	doc := parseDocument(string(data))
+	var blocks []string
+	for i, b := range doc.blocks {
+		blocks = append(blocks, preprocess(b.src, i == 0 && doc.hasFrontMatter()))
+	}
+	out, err := r.Render(strings.Join(blocks, "\n\n"))
 	if err != nil {
 		return fmt.Errorf("rendering markdown: %w", err)
 	}

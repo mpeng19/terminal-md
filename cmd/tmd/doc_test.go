@@ -13,6 +13,8 @@ func TestDocumentRoundTrip(t *testing.T) {
 		"para\n```go\nfmt.Println()\n\nmore\n```\n\nafter\n",
 		"para\n```go\nunclosed\n\nstill code\n",
 		"~~~~\n```\nnot a closer\n~~~~\ntext",
+		"---\ntitle: x\ntags: [a, b]\n---\n\n# Doc\n\n---\n\nrule above\n",
+		"---\ntitle: x\n...\n\n\nbody\n",
 	}
 	for _, src := range cases {
 		if got := parseDocument(src).String(); got != src {
@@ -81,5 +83,21 @@ func TestFenceAfterParagraphKeepsSeparation(t *testing.T) {
 	d.replaceBlock(1, "plain text")
 	if got, want := d.String(), "para\n\nplain text\n"; got != want {
 		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestFrontMatter(t *testing.T) {
+	d := parseDocument("---\ntitle: x\n---\n\n# Doc\n\n---\n\nafter rule\n")
+	if len(d.blocks) != 4 || !isFrontMatter(d.blocks[0].src) || isFrontMatter(d.blocks[2].src) {
+		t.Fatalf("blocks = %+v", d.blocks)
+	}
+	if got, want := frontMatterAsCode(d.blocks[0].src), "```yaml\ntitle: x\n```"; got != want {
+		t.Errorf("frontMatterAsCode = %q, want %q", got, want)
+	}
+	if parseDocument("\n---\nx\n---\n").hasFrontMatter() {
+		t.Error("front matter must start on the first line")
+	}
+	if !d.hasFrontMatter() {
+		t.Error("expected front matter")
 	}
 }

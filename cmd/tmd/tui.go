@@ -640,15 +640,19 @@ func (m *model) layout() {
 }
 
 // renderBlock renders one block's markdown to lines, cached by source.
-func (m *model) renderBlock(src string) []string {
-	if lines, ok := m.cache[src]; ok {
+func (m *model) renderBlock(src string, frontMatter bool) []string {
+	key := src
+	if frontMatter {
+		key = "\x00fm\x00" + src
+	}
+	if lines, ok := m.cache[key]; ok {
 		return lines
 	}
 	var out string
 	if m.renderErr != nil {
 		out = m.th.chrome.error.Render("render error: " + m.renderErr.Error())
 	} else if m.renderer != nil {
-		if s, err := m.renderer.Render(src); err == nil {
+		if s, err := m.renderer.Render(preprocess(src, frontMatter)); err == nil {
 			out = trimBlankLines(s)
 		} else {
 			out = m.th.chrome.error.Render("render error: " + err.Error())
@@ -663,8 +667,18 @@ func (m *model) renderBlock(src string) []string {
 	} else {
 		lines = strings.Split(out, "\n")
 	}
-	m.cache[src] = lines
+	m.cache[key] = lines
 	return lines
+}
+
+// preprocess rewrites markdown that glamour can't render on its own: YAML
+// front matter becomes a yaml code block, LaTeX math becomes Unicode and
+// footnotes become superscripts.
+func preprocess(src string, frontMatter bool) string {
+	if frontMatter {
+		return frontMatterAsCode(src)
+	}
+	return convertFootnotes(convertMath(src))
 }
 
 // trimBlankLines drops leading and trailing lines that are visually empty
@@ -690,12 +704,13 @@ func (m *model) compose() {
 	refs := []lineRef{{-1, 0}}
 	m.blockStart = make([]int, len(m.doc.blocks))
 	m.blockLen = make([]int, len(m.doc.blocks))
+	fm := m.doc.hasFrontMatter()
 	for i, b := range m.doc.blocks {
 		var bl []string
 		if m.mode == modeInsert && i == m.editIdx {
 			bl = strings.Split(m.ta.View(), "\n")
 		} else {
-			bl = m.renderBlock(b.src)
+			bl = m.renderBlock(b.src, fm && i == 0)
 		}
 		mark := " "
 		switch {

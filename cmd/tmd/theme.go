@@ -102,7 +102,9 @@ func loadTheme(name string, dark bool, overrides map[string]string) (theme, erro
 	default:
 		if cfg, ok := styles.DefaultStyles[name]; ok {
 			th = theme{name: name, styles: *cfg, chrome: defaultChrome()}
-			cleanHeadings(&th.styles)
+			if name != "notty" && name != "ascii" {
+				cleanHeadings(&th.styles) // plain text keeps its '#' markers
+			}
 			break
 		}
 		data, err := os.ReadFile(name)
