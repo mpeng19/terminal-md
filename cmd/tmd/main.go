@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,19 @@ import (
 	"golang.org/x/term"
 )
 
-const version = "0.1.0"
+// version is set by the release build (-X main.version=...). For
+// 'go install ...@vX.Y.Z' builds it is taken from the module version.
+var version = "dev"
+
+func versionString() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return strings.TrimPrefix(info.Main.Version, "v")
+	}
+	return version
+}
 
 const (
 	defaultSize      = 0.75 // fraction of the terminal the box occupies
@@ -157,7 +170,7 @@ Keys (defaults):
   ctrl+s        save                      v             select mode (releases the mouse)
   q / ctrl+c    quit
   While editing: esc finishes, ctrl+s saves, ctrl+z / ctrl+r undo / redo.
-`, version, themeNames(), defaultSize, defaultMinWidth, defaultMinHeight, defaultConfigPath())
+`, versionString(), themeNames(), defaultSize, defaultMinWidth, defaultMinHeight, defaultConfigPath())
 }
 
 // parseArgs handles flags in any position (before or after the file). It
@@ -232,7 +245,7 @@ func parseArgs() (options, string, map[string]bool) {
 			opts.watch = false
 			set[name] = true
 		case "v", "version":
-			fmt.Println("tmd " + version)
+			fmt.Println("tmd " + versionString())
 			os.Exit(0)
 		case "h", "help":
 			usage()
