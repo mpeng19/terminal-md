@@ -7,7 +7,7 @@ tmd README.md
 ```
 
 `tmd` opens a bordered, scrollable box centered in the terminal (75% of the
-width and height by default), renders the Markdown inside it with
+width and height by default, filling more of it on small windows), renders the Markdown inside it with
 [glamour](https://github.com/charmbracelet/glamour), and restores whatever was
 on screen when you quit — it uses the alternate screen buffer, so your
 scrollback and prompt come back untouched.
@@ -54,6 +54,10 @@ Options:
   -s, --style <name|path>  glamour style: auto, dark, light, dracula, notty,
                            or a path to a glamour JSON style (default: auto)
       --size <fraction>    fraction of the terminal the box occupies (default: 0.75)
+      --min-width <cols>   box is never narrower than this, unless the terminal
+                           is (default: 100)
+      --min-height <rows>  box is never shorter than this, unless the terminal
+                           is (default: 30)
       --no-mouse           don't capture the mouse (allows text selection)
       --no-watch           don't re-render when the file changes on disk
   -v, --version            print version
@@ -80,7 +84,10 @@ native text selection, pass `--no-mouse` if you want to copy text out of the box
 - **Live reload.** The file is polled twice a second and re-rendered when it
   changes, so you can keep `tmd` open next to your editor. Disable with
   `--no-watch`.
-- **Resizing.** The box re-lays-out and re-wraps when the terminal is resized.
+- **Sizing.** The box takes 75% of the terminal (`--size`), but never shrinks
+  below 100×30 (`--min-width` / `--min-height`) so text stays readable in
+  small windows — on an 80×24 terminal it simply fills the window. It
+  re-lays-out and re-wraps when the terminal is resized.
 - **Style.** `auto` picks `dark` or `light` from the terminal's background
   color. Set `GLAMOUR_STYLE` or pass `--style` to override.
 - **Piping.** When stdout is not a terminal (`tmd doc.md > out.txt`), the

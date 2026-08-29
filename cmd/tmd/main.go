@@ -24,18 +24,22 @@ import (
 const version = "0.1.0"
 
 const (
-	defaultSize   = 0.75 // fraction of the terminal the box occupies
-	minSize       = 0.2
-	minBoxWidth   = 24
-	minBoxHeight  = 6
-	watchInterval = 500 * time.Millisecond
-	noticeTimeout = 2 * time.Second
+	defaultSize      = 0.75 // fraction of the terminal the box occupies
+	minSize          = 0.2
+	defaultMinWidth  = 100 // the box never gets narrower than this (unless the terminal is)
+	defaultMinHeight = 30  // the box never gets shorter than this (unless the terminal is)
+	minBoxWidth      = 24
+	minBoxHeight     = 6
+	watchInterval    = 500 * time.Millisecond
+	noticeTimeout    = 2 * time.Second
 )
 
 // options are the command-line settings.
 type options struct {
 	style string  // glamour style name or path to a JSON style; "auto" = detect
 	size  float64 // fraction of the terminal width/height the box occupies
+	minW  int     // lower bound on the box width, capped at the terminal width
+	minH  int     // lower bound on the box height, capped at the terminal height
 	mouse bool    // capture the mouse so the wheel scrolls the box
 	watch bool    // re-render when the file changes on disk
 }
@@ -99,6 +103,10 @@ Options:
   -s, --style <name|path>  glamour style: auto, dark, light, dracula, notty,
                            or a path to a glamour JSON style (default: auto)
       --size <fraction>    fraction of the terminal the box occupies (default: %.2f)
+      --min-width <cols>   box is never narrower than this, unless the terminal
+                           is (default: %d)
+      --min-height <rows>  box is never shorter than this, unless the terminal
+                           is (default: %d)
       --no-mouse           don't capture the mouse (allows text selection)
       --no-watch           don't re-render when the file changes on disk
   -v, --version            print version
@@ -108,12 +116,12 @@ Keys:
   ↑/k ↓/j  scroll        space/f, b   page down/up      d/u  half page
   g / G    top / bottom  ←/h →/l      scroll sideways   r    reload
   q / esc  quit
-`, version, defaultSize)
+`, version, defaultSize, defaultMinWidth, defaultMinHeight)
 }
 
 // parseArgs handles flags in any position (before or after the file).
 func parseArgs() (options, string) {
-	opts := options{style: "auto", size: defaultSize, mouse: true, watch: true}
+	opts := options{style: "auto", size: defaultSize, minW: defaultMinWidth, minH: defaultMinHeight, mouse: true, watch: true}
 	var positional []string
 	fail := func(format string, a ...any) {
 		fmt.Fprintf(os.Stderr, "tmd: "+format+"\n\n", a...)
@@ -147,11 +155,23 @@ func parseArgs() (options, string) {
 		case "s", "style":
 			opts.style = needValue()
 		case "size":
-			f, err := strconv.ParseFloat(needValue(), 64)
+			raw := needValue()
+			f, err := strconv.ParseFloat(raw, 64)
 			if err != nil {
-				fail("invalid --size %q: expected a number such as 0.75", value)
+				fail("invalid --size %q: expected a number such as 0.75", raw)
 			}
 			opts.size = min(max(f, minSize), 1)
+		case "min-width", "min-height":
+			raw := needValue()
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 0 {
+				fail("invalid --%s %q: expected a non-negative integer", name, raw)
+			}
+			if name == "min-width" {
+				opts.minW = n
+			} else {
+				opts.minH = n
+			}
 		case "no-mouse":
 			opts.mouse = false
 		case "no-watch":
@@ -415,12 +435,16 @@ func (m *model) expireNotice() {
 	}
 }
 
-// layout sizes the box and viewport from the terminal size.
+// layout sizes the box and viewport from the terminal size: a fraction of
+// the terminal, but never smaller than the configured minimum so that text
+// stays readable in small windows, and never larger than the terminal.
 func (m *model) layout() {
 	bw := int(float64(m.width)*m.opts.size + 0.5)
 	bh := int(float64(m.height)*m.opts.size + 0.5)
-	m.boxW = min(max(bw, minBoxWidth), m.width)
-	m.boxH = min(max(bh, minBoxHeight), m.height)
+	bw = max(bw, m.opts.minW, minBoxWidth)
+	bh = max(bh, m.opts.minH, minBoxHeight)
+	m.boxW = min(bw, m.width)
+	m.boxH = min(bh, m.height)
 	m.vp.Width = max(m.boxW-4, 1) // border + one space of padding on each side
 	m.vp.Height = max(m.boxH-2, 1)
 }
