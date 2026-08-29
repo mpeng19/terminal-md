@@ -1,6 +1,6 @@
 # terminal-md (`tmd`)
 
-Preview a Markdown file in a centered box that takes up most of your terminal.
+Preview — and edit — a Markdown file in a centered box that takes up most of your terminal.
 
 ```sh
 tmd README.md
@@ -66,24 +66,57 @@ Options:
 
 ### Keys
 
-| Key                | Action               |
-|--------------------|----------------------|
-| `↓` / `j`, `↑` / `k` | scroll a line        |
-| `space` / `f`, `b` | page down / up       |
-| `d` / `u`          | half page down / up  |
-| `g` / `G`          | top / bottom         |
-| `→` / `l`, `←` / `h` | scroll sideways (wide code blocks) |
-| `r`                | reload the file      |
-| `q` / `esc`        | quit                 |
+`tmd` is modal, like vim: you start in **normal** mode, where a bar in the
+left margin marks the current block (a paragraph, heading, list, code block…).
+
+| Normal mode          | Action                                   |
+|----------------------|------------------------------------------|
+| `↓` / `j`, `↑` / `k` | move the cursor a line                   |
+| `space` / `f`, `b`   | page down / up                           |
+| `ctrl+d` / `ctrl+u`  | half page down / up                      |
+| `g` / `G`            | top / bottom                             |
+| `→` / `l`, `←` / `h` | scroll sideways (wide code blocks)       |
+| `i` / `enter`        | edit the current block                   |
+| `a`                  | edit the current block, cursor at the end|
+| `o` / `O`            | new block below / above                  |
+| `dd`                 | delete the current block                 |
+| `u` / `ctrl+z`       | undo                                     |
+| `ctrl+r`             | redo                                     |
+| `ctrl+s`             | save                                     |
+| `r`                  | reload from disk                         |
+| `q` / `ctrl+c`       | quit (asks first if there are unsaved changes) |
+
+| Insert mode          | Action                                   |
+|----------------------|------------------------------------------|
+| `esc`                | finish editing (re-renders the block)    |
+| `ctrl+s`             | save                                     |
+| `ctrl+z` / `ctrl+r`  | undo / redo typing                       |
+| `ctrl+a` / `ctrl+e`  | start / end of line                      |
+| `ctrl+w`, `ctrl+k`   | delete word backwards, delete to end of line |
 
 The mouse wheel scrolls too. Because mouse capture disables the terminal's
 native text selection, pass `--no-mouse` if you want to copy text out of the box.
 
+### Editing
+
+Press `i` on any block and it turns into an inline editor showing that
+block's raw markdown, while the rest of the document stays rendered. Type
+plain markdown, press `esc`, and the block re-renders in place. Blank lines
+inside the editor split it into several blocks; an emptied block is removed.
+
+- **Undo / redo** (`u`, `ctrl+z` / `ctrl+r`) work at block granularity in
+  normal mode and at word granularity while typing.
+- **Save** with `ctrl+s` in either mode. The title shows `[+]` while there
+  are unsaved changes, and `q` asks before discarding them.
+- Whitespace in unedited blocks is preserved byte-for-byte, so saving a file
+  you only viewed produces no diff.
+
 ### Behaviour
 
 - **Live reload.** The file is polled twice a second and re-rendered when it
-  changes, so you can keep `tmd` open next to your editor. Disable with
-  `--no-watch`.
+  changes, so you can keep `tmd` open next to your editor. If you have
+  unsaved edits it warns instead of reloading (`r` reloads explicitly).
+  Disable with `--no-watch`.
 - **Sizing.** The box takes 75% of the terminal (`--size`), but never shrinks
   below 100×30 (`--min-width` / `--min-height`) so text stays readable in
   small windows — on an 80×24 terminal it simply fills the window. It
