@@ -43,7 +43,7 @@ func TestConfigOverrides(t *testing.T) {
 	os.WriteFile(path, []byte(`
 [window]
 size = 0.5
-mouse = false
+mouse = true
 [theme]
 name = "github"
 variant = "light"
@@ -63,13 +63,13 @@ done = ["esc", "ctrl+g"]
 		t.Errorf("unexpected warnings: %v", warnings)
 	}
 
-	opts := options{size: defaultSize, mouse: true, watch: true, style: "auto"}
+	opts := options{size: defaultSize, mouse: false, watch: true, style: "auto"}
 	cfg.apply(&opts, map[string]bool{"size": true})
 	if opts.size != defaultSize {
 		t.Errorf("size set by flag should win, got %v", opts.size)
 	}
-	if opts.mouse {
-		t.Error("mouse should be disabled by config")
+	if !opts.mouse {
+		t.Error("mouse should be enabled by config")
 	}
 	if opts.style != "github" || opts.variant != "light" || opts.colors["border"] != "#FF0000" {
 		t.Errorf("theme not applied: %+v", opts)
@@ -88,8 +88,8 @@ done = ["esc", "ctrl+g"]
 	if got := km.insert[actDone]; len(got) != 2 || got[1] != "ctrl+g" {
 		t.Errorf("insert.done = %v", got)
 	}
-	if got := km.normal[actDown]; len(got) != 2 {
-		t.Errorf("unmentioned actions should keep defaults, down = %v", got)
+	if got := km.normal[actScrollDn]; len(got) != 1 || got[0] != "down" {
+		t.Errorf("unmentioned actions should keep defaults, scroll_down = %v", got)
 	}
 	if act, _ := km.normal.resolve([]string{"ctrl+x"}); act != actDelete {
 		t.Errorf("ctrl+x should resolve to delete, got %q", act)

@@ -14,6 +14,8 @@ const (
 	actQuit      action = "quit"
 	actDown      action = "down"
 	actUp        action = "up"
+	actScrollDn  action = "scroll_down"
+	actScrollUp  action = "scroll_up"
 	actPageDown  action = "page_down"
 	actPageUp    action = "page_up"
 	actHalfDown  action = "half_down"
@@ -49,8 +51,10 @@ func defaultKeymap() keymap {
 	return keymap{
 		normal: bindings{
 			actQuit:     {"q", "ctrl+c"},
-			actDown:     {"j", "down"},
-			actUp:       {"k", "up"},
+			actDown:     {"j"},
+			actUp:       {"k"},
+			actScrollDn: {"down"},
+			actScrollUp: {"up"},
 			actPageDown: {"space", "f", "pgdown"},
 			actPageUp:   {"b", "pgup"},
 			actHalfDown: {"ctrl+d"},

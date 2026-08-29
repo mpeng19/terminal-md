@@ -319,6 +319,12 @@ func (m model) do(act action) (tea.Model, tea.Cmd) {
 		m.moveCursor(1)
 	case actUp:
 		m.moveCursor(-1)
+	case actScrollDn:
+		m.vp.ScrollDown(1)
+		m.clampCursorToView()
+	case actScrollUp:
+		m.vp.ScrollUp(1)
+		m.clampCursorToView()
 	case actPageDown:
 		m.vp.PageDown()
 		m.clampCursorToView()
@@ -400,7 +406,7 @@ func (m model) do(act action) (tea.Model, tea.Cmd) {
 
 	m.compose()
 	switch act {
-	case actPageDown, actPageUp, actHalfDown, actHalfUp, actTop, actBottom, actLeft, actRight:
+	case actScrollDn, actScrollUp, actPageDown, actPageUp, actHalfDown, actHalfUp, actTop, actBottom, actLeft, actRight:
 	default:
 		m.scrollToCursor()
 	}

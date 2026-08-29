@@ -98,7 +98,7 @@ func (c fileConfig) apply(opts *options, setByFlag map[string]bool) {
 	if w.MinHeight != nil && !setByFlag["min-height"] {
 		opts.minH = max(*w.MinHeight, 0)
 	}
-	if w.Mouse != nil && !setByFlag["no-mouse"] {
+	if w.Mouse != nil && !setByFlag["mouse"] {
 		opts.mouse = *w.Mouse
 	}
 	if w.Watch != nil && !setByFlag["no-watch"] {
@@ -200,8 +200,10 @@ size = 0.75
 # The box never gets smaller than this, unless the terminal is.
 min_width = 100
 min_height = 30
-# Capture the mouse so the wheel scrolls (disables native text selection).
-mouse = true
+# Capture the mouse so the wheel scrolls natively. Off by default so you can
+# select and copy text; terminals (and tmux with 'mouse on') turn the wheel
+# into arrow keys in full-screen apps anyway, which scroll the view.
+mouse = false
 # Re-render when the file changes on disk.
 watch = true
 
@@ -226,8 +228,10 @@ variant = "auto"
 # "end", "pgup"/"pgdown", "ctrl+x", "alt+x", "f1".
 [keys]
 quit      = ["q", "ctrl+c"]
-down      = ["j", "down"]
-up        = ["k", "up"]
+down        = ["j"]        # move the cursor
+up          = ["k"]
+scroll_down = ["down"]     # scroll the view (this is what the mouse wheel sends)
+scroll_up   = ["up"]
 page_down = ["space", "f", "pgdown"]
 page_up   = ["b", "pgup"]
 half_down = ["ctrl+d"]

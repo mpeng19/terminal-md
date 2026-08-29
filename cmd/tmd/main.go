@@ -132,7 +132,10 @@ Options:
                            is (default: %d)
       --min-height <rows>  box is never shorter than this, unless the terminal
                            is (default: %d)
-      --no-mouse           don't capture the mouse (allows text selection)
+      --mouse              capture the mouse so the wheel scrolls natively.
+                           Off by default so you can select and copy text;
+                           most terminals (and tmux with 'mouse on') turn
+                           the wheel into arrow keys anyway
       --no-watch           don't re-render when the file changes on disk
       --config <path>      config file (default: %s)
       --init-config        write a commented default config file and exit
@@ -144,7 +147,8 @@ Config:
   run 'tmd --init-config' to create one with the defaults spelled out.
 
 Keys (defaults):
-  ↑/k ↓/j   move       space/f, b  page       ctrl+d/u  half page
+  j / k     move       ↑ / ↓       scroll     space/f, b  page
+  ctrl+d/u  half page
   g / G     top/end    ←/h →/l     sideways   r         reload
   i / enter edit block a  edit at end          o / O     new block below/above
   dd        delete     u / ctrl+z  undo       ctrl+r    redo
@@ -158,7 +162,7 @@ Keys (defaults):
 // fill in the rest.
 func parseArgs() (options, string, map[string]bool) {
 	opts := options{style: "auto", size: defaultSize, minW: defaultMinWidth, minH: defaultMinHeight,
-		mouse: true, watch: true, config: defaultConfigPath()}
+		mouse: false, watch: true, config: defaultConfigPath()}
 	set := map[string]bool{}
 	initConfig := false
 	var positional []string
@@ -218,9 +222,9 @@ func parseArgs() (options, string, map[string]bool) {
 				opts.minH = n
 			}
 			set[name] = true
-		case "no-mouse":
-			opts.mouse = false
-			set[name] = true
+		case "mouse", "no-mouse":
+			opts.mouse = name == "mouse"
+			set["mouse"] = true
 		case "no-watch":
 			opts.watch = false
 			set[name] = true

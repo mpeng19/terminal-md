@@ -61,7 +61,8 @@ Options:
                            is (default: 100)
       --min-height <rows>  box is never shorter than this, unless the terminal
                            is (default: 30)
-      --no-mouse           don't capture the mouse (allows text selection)
+      --mouse              capture the mouse so the wheel scrolls natively
+                           (off by default so you can select and copy text)
       --no-watch           don't re-render when the file changes on disk
       --config <path>      config file (default: ~/.config/tmd/config.toml)
       --init-config        write a commented default config file and exit
@@ -76,7 +77,8 @@ left margin marks the current block (a paragraph, heading, list, code block…).
 
 | Normal mode          | Action                                   |
 |----------------------|------------------------------------------|
-| `↓` / `j`, `↑` / `k` | move the cursor a line                   |
+| `j` / `k`            | move the cursor a line                   |
+| `↓` / `↑`            | scroll the view a line (what the wheel sends) |
 | `space` / `f`, `b`   | page down / up                           |
 | `ctrl+d` / `ctrl+u`  | half page down / up                      |
 | `g` / `G`            | top / bottom                             |
@@ -99,8 +101,15 @@ left margin marks the current block (a paragraph, heading, list, code block…).
 | `ctrl+a` / `ctrl+e`  | start / end of line                      |
 | `ctrl+w`, `ctrl+k`   | delete word backwards, delete to end of line |
 
-The mouse wheel scrolls too. Because mouse capture disables the terminal's
-native text selection, pass `--no-mouse` if you want to copy text out of the box.
+### Mouse, scrolling and copying
+
+`tmd` doesn't capture the mouse by default, so you can select and copy text
+the way you always do — in tmux with `mouse on` that means drag to select and
+it's copied on release. The wheel still works: terminals (iTerm2, Terminal.app,
+kitty, Alacritty, WezTerm…) and tmux translate wheel movement into `↑`/`↓` for
+full-screen apps, which scroll the view. Pass `--mouse` (or set
+`mouse = true` in the config) if you'd rather have native wheel scrolling
+and don't need selection.
 
 ### Editing
 
@@ -151,8 +160,16 @@ emoji shortcodes — plus a few things it doesn't:
   Unicode: `$e^{i\pi} + 1 = 0$` → e^(iπ) + 1 = 0, `$\sum_{i=1}^{n} x_i$` →
   ∑ᵢ₌₁ⁿ xᵢ, `\frac{1}{2}` → ½, `\sqrt{x^2+y^2}` → √(x² + y²), Greek letters,
   operators, arrows, `\mathbb{R}` → ℝ, accents, `cases`/`aligned`/matrix
-  environments. Display math is set off as its own block. Dollar amounts
-  (`$5 and $10`) and anything in code are left alone.
+  environments. Display math is set off as its own block with the limits of
+  sums, products and integrals stacked above and below the operator:
+
+  ```
+   n
+   ∑ i = (n(n+1))/2
+  i=1
+  ```
+
+  Dollar amounts (`$5 and $10`) and anything in code are left alone.
 - **Footnotes.** `[^1]` references and `[^1]:` definitions become
   superscripts.
 - **YAML front matter** at the top of a file is shown as a `yaml` block.
