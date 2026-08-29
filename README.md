@@ -63,6 +63,8 @@ Options:
                            is (default: 30)
       --no-mouse           don't capture the mouse (allows text selection)
       --no-watch           don't re-render when the file changes on disk
+      --config <path>      config file (default: ~/.config/tmd/config.toml)
+      --init-config        write a commented default config file and exit
   -v, --version            print version
   -h, --help               show this help
 ```
@@ -137,6 +139,54 @@ inside the editor split it into several blocks; an emptied block is removed.
 - **Piping.** When stdout is not a terminal (`tmd doc.md > out.txt`), the
   rendered Markdown is printed instead of opening the box, using the `notty`
   style unless one is given explicitly.
+
+## Configuration
+
+Everything above — window size, theme, colors and every key binding — can be
+set in `~/.config/tmd/config.toml` (`$XDG_CONFIG_HOME/tmd/config.toml`, or
+`$TMD_CONFIG`, or `--config <path>`). Create one with all the defaults
+spelled out and commented:
+
+```sh
+tmd --init-config
+```
+
+A smaller example:
+
+```toml
+[window]
+size = 0.9          # fraction of the terminal (0.2 – 1.0)
+min_width = 80      # never smaller than this, unless the terminal is
+min_height = 24
+mouse = true
+watch = true
+
+[theme]
+name = "github"     # default, github, github-dark, github-light, dark, light,
+                    # dracula, tokyo-night, pink, notty, or a glamour JSON path
+variant = "auto"    # auto | dark | light
+
+[theme.colors]      # override any theme's colors: hex or ANSI-256 numbers
+link = "#0969DA"
+border = "#3D444D"
+code_theme = "monokai"   # chroma style for code blocks
+
+[keys]              # normal mode; a key name or a list, chords as "d d"
+quit = ["q", "ctrl+c"]
+edit = ["i", "enter"]
+delete = ["d d", "ctrl+x"]
+
+[keys.insert]       # while editing a block
+done = ["esc", "ctrl+g"]
+save = "ctrl+s"
+```
+
+Precedence is defaults → config file → command-line flags. An action listed
+under `[keys]` replaces its default keys entirely; actions you don't mention
+keep theirs. Color keys: `text`, `muted`, `heading`, `h1_fg`, `h1_bg`, `link`,
+`code`, `code_bg`, `code_theme`, `quote`, `rule`, `border`, `accent`,
+`insert`, `notice`, `error`. Unknown settings produce a warning; unknown
+actions or colors are errors.
 
 ## Development
 

@@ -34,6 +34,10 @@ type options struct {
 	minH  int     // lower bound on the box height, capped at the terminal height
 	mouse bool    // capture the mouse so the wheel scrolls the box
 	watch bool    // re-render when the file changes on disk
+
+	variant string            // theme variant from config: auto, dark or light
+	colors  map[string]string // theme color overrides from config
+	config  string            // config file path
 }
 
 // source is where the markdown came from.
@@ -45,7 +49,22 @@ type source struct {
 func (s source) isStdin() bool { return s.path == "" }
 
 func main() {
-	opts, path := parseArgs()
+	opts, path, setByFlag := parseArgs()
+
+	cfg, warnings, err := loadConfig(opts.config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tmd: %v\n", err)
+		os.Exit(1)
+	}
+	for _, w := range warnings {
+		fmt.Fprintf(os.Stderr, "tmd: warning: %s\n", w)
+	}
+	cfg.apply(&opts, setByFlag)
+	keys, err := cfg.keymap()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tmd: %s: %v\n", opts.config, err)
+		os.Exit(1)
+	}
 
 	src, data, err := load(path)
 	if err != nil {
@@ -55,8 +74,13 @@ func main() {
 
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		// Not attached to a terminal (e.g. piped into a file or another
-		// program): just print the rendered markdown.
-		if err := renderPlain(data, opts.style); err != nil {
+		// program): just print the rendered markdown, without colors unless
+		// a theme was asked for on the command line.
+		style := "notty"
+		if setByFlag["theme"] {
+			style = opts.style
+		}
+		if err := renderPlain(data, style, opts.colors); err != nil {
 			fmt.Fprintf(os.Stderr, "tmd: %v\n", err)
 			os.Exit(1)
 		}
@@ -65,7 +89,14 @@ func main() {
 
 	// Query the terminal background before Bubble Tea takes over the tty;
 	// this also warms lipgloss's cache so adaptive colors don't query later.
-	th, err := loadTheme(opts.style, detectDark())
+	dark := detectDark()
+	switch opts.variant {
+	case "dark":
+		dark = true
+	case "light":
+		dark = false
+	}
+	th, err := loadTheme(opts.style, dark, opts.colors)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tmd: %v\n", err)
 		os.Exit(1)
@@ -75,7 +106,7 @@ func main() {
 	if opts.mouse {
 		progOpts = append(progOpts, tea.WithMouseCellMotion())
 	}
-	if _, err := tea.NewProgram(newModel(src, data, opts, th), progOpts...).Run(); err != nil {
+	if _, err := tea.NewProgram(newModel(src, data, opts, th, keys), progOpts...).Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "tmd: %v\n", err)
 		os.Exit(1)
 	}
@@ -103,22 +134,33 @@ Options:
                            is (default: %d)
       --no-mouse           don't capture the mouse (allows text selection)
       --no-watch           don't re-render when the file changes on disk
+      --config <path>      config file (default: %s)
+      --init-config        write a commented default config file and exit
   -v, --version            print version
   -h, --help               show this help
 
-Keys:
+Config:
+  Window size, theme and every key binding can be set in the config file;
+  run 'tmd --init-config' to create one with the defaults spelled out.
+
+Keys (defaults):
   ↑/k ↓/j   move       space/f, b  page       ctrl+d/u  half page
   g / G     top/end    ←/h →/l     sideways   r         reload
   i / enter edit block a  edit at end          o / O     new block below/above
   dd        delete     u / ctrl+z  undo       ctrl+r    redo
   ctrl+s    save       q           quit
   In the editor: esc finishes, ctrl+s saves, ctrl+z / ctrl+r undo / redo.
-`, version, themeNames(), defaultSize, defaultMinWidth, defaultMinHeight)
+`, version, themeNames(), defaultSize, defaultMinWidth, defaultMinHeight, defaultConfigPath())
 }
 
-// parseArgs handles flags in any position (before or after the file).
-func parseArgs() (options, string) {
-	opts := options{style: "auto", size: defaultSize, minW: defaultMinWidth, minH: defaultMinHeight, mouse: true, watch: true}
+// parseArgs handles flags in any position (before or after the file). It
+// also reports which options were set explicitly so the config file can
+// fill in the rest.
+func parseArgs() (options, string, map[string]bool) {
+	opts := options{style: "auto", size: defaultSize, minW: defaultMinWidth, minH: defaultMinHeight,
+		mouse: true, watch: true, config: defaultConfigPath()}
+	set := map[string]bool{}
+	initConfig := false
 	var positional []string
 	fail := func(format string, a ...any) {
 		fmt.Fprintf(os.Stderr, "tmd: "+format+"\n\n", a...)
@@ -151,6 +193,11 @@ func parseArgs() (options, string) {
 		switch name {
 		case "t", "theme", "s", "style":
 			opts.style = needValue()
+			set["theme"] = true
+		case "config":
+			opts.config = needValue()
+		case "init-config":
+			initConfig = true
 		case "size":
 			raw := needValue()
 			f, err := strconv.ParseFloat(raw, 64)
@@ -158,6 +205,7 @@ func parseArgs() (options, string) {
 				fail("invalid --size %q: expected a number such as 0.75", raw)
 			}
 			opts.size = min(max(f, minSize), 1)
+			set["size"] = true
 		case "min-width", "min-height":
 			raw := needValue()
 			n, err := strconv.Atoi(raw)
@@ -169,10 +217,13 @@ func parseArgs() (options, string) {
 			} else {
 				opts.minH = n
 			}
+			set[name] = true
 		case "no-mouse":
 			opts.mouse = false
+			set[name] = true
 		case "no-watch":
 			opts.watch = false
+			set[name] = true
 		case "v", "version":
 			fmt.Println("tmd " + version)
 			os.Exit(0)
@@ -184,18 +235,27 @@ func parseArgs() (options, string) {
 		}
 	}
 
+	if initConfig {
+		if err := writeDefaultConfig(opts.config); err != nil {
+			fmt.Fprintf(os.Stderr, "tmd: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("wrote " + opts.config)
+		os.Exit(0)
+	}
+
 	switch len(positional) {
 	case 0:
 		if term.IsTerminal(int(os.Stdin.Fd())) {
 			fail("no file given")
 		}
-		return opts, "-"
+		return opts, "-", set
 	case 1:
-		return opts, positional[0]
+		return opts, positional[0], set
 	default:
 		fail("expected one file, got %d", len(positional))
 	}
-	return opts, ""
+	return opts, "", set
 }
 
 // load reads the markdown from a file, or from stdin when path is "-".
@@ -234,11 +294,8 @@ func detectDark() bool {
 }
 
 // renderPlain writes the rendered markdown to stdout for non-terminal output.
-func renderPlain(data []byte, style string) error {
-	if style == "auto" {
-		style = "notty"
-	}
-	th, err := loadTheme(style, true)
+func renderPlain(data []byte, style string, colors map[string]string) error {
+	th, err := loadTheme(style, true, colors)
 	if err != nil {
 		return err
 	}

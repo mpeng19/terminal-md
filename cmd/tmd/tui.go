@@ -93,8 +93,8 @@ type model struct {
 	noticeUntil time.Time
 }
 
-func newModel(src source, data []byte, opts options, th theme) model {
-	m := model{src: src, opts: opts, keys: defaultKeymap(), th: th}
+func newModel(src source, data []byte, opts options, th theme, keys keymap) model {
+	m := model{src: src, opts: opts, keys: keys, th: th}
 	m.doc = parseDocument(string(data))
 	m.savedSrc = m.doc.String()
 	if !src.isStdin() {

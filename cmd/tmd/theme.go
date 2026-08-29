@@ -31,12 +31,34 @@ type chrome struct {
 	insert lipgloss.Style // marker and label while editing
 }
 
-// palette is the handful of colors a built-in theme is generated from.
-type palette struct {
-	text, muted, heading, link, code, codeBg, quote, rule string
-	h1Fg, h1Bg                                            string // "" = plain bold heading
-	codeTheme                                             string // chroma style name
-	border, accent, insert, notice, errorC                string
+// colorKeys are the names accepted in [theme.colors] and used to define
+// the built-in palettes.
+var colorKeys = map[string]string{
+	"text":       "body text",
+	"muted":      "secondary text: hints, H5/H6, image captions",
+	"heading":    "H2–H4",
+	"h1_fg":      "H1 text (with h1_bg it becomes a highlighted block)",
+	"h1_bg":      "H1 background, or \"none\"",
+	"link":       "links",
+	"code":       "inline code text",
+	"code_bg":    "inline code background, or \"none\"",
+	"code_theme": "chroma style for code blocks, e.g. github, dracula, monokai",
+	"quote":      "block quotes",
+	"rule":       "horizontal rules",
+	"border":     "box border",
+	"accent":     "title and cursor bar",
+	"insert":     "editing marker and INSERT label",
+	"notice":     "status messages",
+	"error":      "error messages",
+}
+
+func colorKeyNames() string {
+	names := make([]string, 0, len(colorKeys))
+	for k := range colorKeys {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 var builtinThemes = map[string]string{
@@ -62,51 +84,56 @@ func themeNames() string {
 	return strings.Join(names, ", ")
 }
 
-// loadTheme resolves a theme by name (or path to a glamour JSON style).
-// dark selects the variant for themes that adapt to the terminal background.
-func loadTheme(name string, dark bool) (theme, error) {
+// loadTheme resolves a theme by name (or path to a glamour JSON style),
+// picks the dark or light variant where the theme adapts, and applies any
+// color overrides.
+func loadTheme(name string, dark bool, overrides map[string]string) (theme, error) {
+	var th theme
 	switch name {
 	case "", "auto", "default":
-		if dark {
-			return glamourTheme("default", styles.DarkStyleConfig, defaultChrome()), nil
-		}
-		return glamourTheme("default", styles.LightStyleConfig, defaultChrome()), nil
+		th = baseTheme("default", dark)
 	case "github":
-		if dark {
-			return paletteTheme("github", githubDark, styles.DarkStyleConfig), nil
+		th = baseTheme("github", dark)
+		th.apply(githubPalette(dark))
+	case "github-dark", "github-light":
+		d := name == "github-dark"
+		th = baseTheme(name, d)
+		th.apply(githubPalette(d))
+	default:
+		if cfg, ok := styles.DefaultStyles[name]; ok {
+			th = theme{name: name, styles: *cfg, chrome: defaultChrome()}
+			cleanHeadings(&th.styles)
+			break
 		}
-		return paletteTheme("github", githubLight, styles.LightStyleConfig), nil
-	case "github-dark":
-		return paletteTheme(name, githubDark, styles.DarkStyleConfig), nil
-	case "github-light":
-		return paletteTheme(name, githubLight, styles.LightStyleConfig), nil
+		data, err := os.ReadFile(name)
+		if err != nil {
+			return theme{}, fmt.Errorf("unknown theme %q (built-in: %s) and not a readable file: %w", name, themeNames(), err)
+		}
+		var cfg ansi.StyleConfig
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return theme{}, fmt.Errorf("theme file %s: %w", name, err)
+		}
+		th = theme{name: name, styles: cfg, chrome: defaultChrome()}
 	}
-	if cfg, ok := styles.DefaultStyles[name]; ok {
-		return glamourTheme(name, *cfg, defaultChrome()), nil
-	}
-	data, err := os.ReadFile(name)
-	if err != nil {
-		return theme{}, fmt.Errorf("unknown theme %q (built-in: %s) and not a readable file: %w", name, themeNames(), err)
-	}
-	var cfg ansi.StyleConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return theme{}, fmt.Errorf("theme file %s: %w", name, err)
-	}
-	return theme{name: name, styles: cfg, chrome: defaultChrome()}, nil
+	th.apply(overrides)
+	return th, nil
 }
 
-// glamourTheme wraps one of glamour's stock styles with clean headings.
-func glamourTheme(name string, cfg ansi.StyleConfig, ch chrome) theme {
+// baseTheme is glamour's dark or light style with clean headings.
+func baseTheme(name string, dark bool) theme {
+	cfg := styles.LightStyleConfig
+	if dark {
+		cfg = styles.DarkStyleConfig
+	}
 	cleanHeadings(&cfg)
-	return theme{name: name, styles: cfg, chrome: ch}
+	return theme{name: name, styles: cfg, chrome: defaultChrome()}
 }
 
 // cleanHeadings drops the literal "##" markers glamour puts in front of
 // headings and gives each level a distinct look instead. Terminals can't
 // change font size, so hierarchy comes from weight, underline and color.
 func cleanHeadings(cfg *ansi.StyleConfig) {
-	t := true
-	f := false
+	t, f := true, false
 	cfg.H2.Prefix = ""
 	cfg.H2.Underline = &t
 	cfg.H2.Bold = &t
@@ -124,58 +151,83 @@ func cleanHeadings(cfg *ansi.StyleConfig) {
 	cfg.H6.Faint = &t
 }
 
-// paletteTheme builds a full style from a palette, using base for
-// structural settings (margins, indents, bullets) that don't change.
-func paletteTheme(name string, p palette, base ansi.StyleConfig) theme {
-	cfg := base
-	cleanHeadings(&cfg)
-	t := true
-	f := false
+// apply sets the colors named in overrides (see colorKeys) on the theme.
+func (th *theme) apply(overrides map[string]string) {
+	cfg := &th.styles
+	t, f := true, false
 	str := func(s string) *string { return &s }
-
-	cfg.Document.Color = str(p.text)
-	cfg.Heading.Color = str(p.heading)
-	cfg.Heading.Bold = &t
-	if p.h1Bg != "" {
-		cfg.H1.Color, cfg.H1.BackgroundColor = str(p.h1Fg), str(p.h1Bg)
-		cfg.H1.Prefix, cfg.H1.Suffix = " ", " "
-	} else {
-		cfg.H1.Color, cfg.H1.BackgroundColor = str(p.heading), nil
-		cfg.H1.Prefix, cfg.H1.Suffix = "", ""
-		cfg.H1.Underline = &t
+	optional := func(s string) *string {
+		if s == "none" || s == "" {
+			return nil
+		}
+		return &s
 	}
-	cfg.H5.Color = str(p.muted)
-	cfg.H6.Color = str(p.muted)
-	cfg.BlockQuote.Color = str(p.quote)
-	cfg.BlockQuote.IndentToken = str("▌ ")
-	cfg.HorizontalRule.Color = str(p.rule)
-	cfg.Link.Color = str(p.link)
-	cfg.Link.Underline = &t
-	cfg.LinkText.Color = str(p.link)
-	cfg.LinkText.Bold = &f
-	cfg.Image.Color = str(p.link)
-	cfg.ImageText.Color = str(p.muted)
-	cfg.Code.Color = str(p.code)
-	cfg.Code.BackgroundColor = str(p.codeBg)
-	cfg.CodeBlock.Color = str(p.text)
-	cfg.CodeBlock.Chroma = nil
-	cfg.CodeBlock.Theme = p.codeTheme
-	cfg.Item.Color = str(p.text)
-	cfg.Enumeration.Color = str(p.text)
-	cfg.Table.Color = str(p.text)
-	cfg.DefinitionTerm.Bold = &t
-
-	color := func(s string) lipgloss.Color { return lipgloss.Color(s) }
-	ch := chrome{
-		border: lipgloss.NewStyle().Foreground(color(p.border)),
-		title:  lipgloss.NewStyle().Bold(true).Foreground(color(p.accent)),
-		dim:    lipgloss.NewStyle().Foreground(color(p.muted)),
-		notice: lipgloss.NewStyle().Bold(true).Foreground(color(p.notice)),
-		error:  lipgloss.NewStyle().Bold(true).Foreground(color(p.errorC)),
-		cursor: lipgloss.NewStyle().Foreground(color(p.accent)),
-		insert: lipgloss.NewStyle().Bold(true).Foreground(color(p.insert)),
+	for _, k := range sortedKeys(overrides) {
+		v := overrides[k]
+		switch k {
+		case "text":
+			cfg.Document.Color = str(v)
+			cfg.Item.Color = str(v)
+			cfg.Enumeration.Color = str(v)
+			cfg.Table.Color = str(v)
+			cfg.CodeBlock.Color = str(v)
+		case "muted":
+			cfg.H5.Color = str(v)
+			cfg.H6.Color = str(v)
+			cfg.ImageText.Color = str(v)
+			th.chrome.dim = th.chrome.dim.Foreground(lipgloss.Color(v))
+		case "heading":
+			cfg.Heading.Color = str(v)
+			cfg.Heading.Bold = &t
+		case "h1_fg":
+			cfg.H1.Color = str(v)
+		case "h1_bg":
+			cfg.H1.BackgroundColor = optional(v)
+			if cfg.H1.BackgroundColor == nil {
+				cfg.H1.Prefix, cfg.H1.Suffix = "", ""
+				cfg.H1.Underline = &t
+			} else {
+				cfg.H1.Prefix, cfg.H1.Suffix = " ", " "
+				cfg.H1.Underline = &f
+			}
+		case "link":
+			cfg.Link.Color = str(v)
+			cfg.Link.Underline = &t
+			cfg.LinkText.Color = str(v)
+			cfg.Image.Color = str(v)
+		case "code":
+			cfg.Code.Color = str(v)
+		case "code_bg":
+			cfg.Code.BackgroundColor = optional(v)
+		case "code_theme":
+			cfg.CodeBlock.Chroma = nil
+			cfg.CodeBlock.Theme = v
+		case "quote":
+			cfg.BlockQuote.Color = str(v)
+		case "rule":
+			cfg.HorizontalRule.Color = str(v)
+		case "border":
+			th.chrome.border = th.chrome.border.Foreground(lipgloss.Color(v))
+		case "accent":
+			th.chrome.title = th.chrome.title.Foreground(lipgloss.Color(v))
+			th.chrome.cursor = th.chrome.cursor.Foreground(lipgloss.Color(v))
+		case "insert":
+			th.chrome.insert = th.chrome.insert.Foreground(lipgloss.Color(v))
+		case "notice":
+			th.chrome.notice = th.chrome.notice.Foreground(lipgloss.Color(v))
+		case "error":
+			th.chrome.error = th.chrome.error.Foreground(lipgloss.Color(v))
+		}
 	}
-	return theme{name: name, styles: cfg, chrome: ch}
+}
+
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func defaultChrome() chrome {
@@ -190,18 +242,25 @@ func defaultChrome() chrome {
 	}
 }
 
-// GitHub's markdown colors (primer): https://primer.style/foundations/color
-var (
-	githubLight = palette{
-		text: "#1F2328", muted: "#59636E", heading: "#1F2328", link: "#0969DA",
-		code: "#1F2328", codeBg: "#EFF1F3", quote: "#59636E", rule: "#D1D9E0",
-		codeTheme: "github",
-		border:    "#D1D9E0", accent: "#0969DA", insert: "#1A7F37", notice: "#1A7F37", errorC: "#CF222E",
+// githubPalette is GitHub's markdown look (primer colors):
+// https://primer.style/foundations/color
+func githubPalette(dark bool) map[string]string {
+	if dark {
+		return map[string]string{
+			"text": "#E6EDF3", "muted": "#8B949E", "heading": "#E6EDF3",
+			"h1_fg": "#E6EDF3", "h1_bg": "none", "link": "#4493F8",
+			"code": "#E6EDF3", "code_bg": "#343941", "code_theme": "github-dark",
+			"quote": "#8B949E", "rule": "#3D444D",
+			"border": "#3D444D", "accent": "#4493F8", "insert": "#3FB950",
+			"notice": "#3FB950", "error": "#F85149",
+		}
 	}
-	githubDark = palette{
-		text: "#E6EDF3", muted: "#8B949E", heading: "#E6EDF3", link: "#4493F8",
-		code: "#E6EDF3", codeBg: "#343941", quote: "#8B949E", rule: "#3D444D",
-		codeTheme: "github-dark",
-		border:    "#3D444D", accent: "#4493F8", insert: "#3FB950", notice: "#3FB950", errorC: "#F85149",
+	return map[string]string{
+		"text": "#1F2328", "muted": "#59636E", "heading": "#1F2328",
+		"h1_fg": "#1F2328", "h1_bg": "none", "link": "#0969DA",
+		"code": "#1F2328", "code_bg": "#EFF1F3", "code_theme": "github",
+		"quote": "#59636E", "rule": "#D1D9E0",
+		"border": "#D1D9E0", "accent": "#0969DA", "insert": "#1A7F37",
+		"notice": "#1A7F37", "error": "#CF222E",
 	}
-)
+}
