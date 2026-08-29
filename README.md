@@ -107,7 +107,10 @@ through a document feels like scrolling.
 
 ### Mouse, scrolling and copying
 
-The mouse wheel scrolls the box. Capturing the mouse disables the terminal's
+The mouse wheel moves the cursor, and the view follows to keep the current
+block centered — so at the top or bottom of a document the marker walks to
+the first or last block, and scrolling back moves it to the middle before
+the view starts to move. Capturing the mouse disables the terminal's
 native text selection, so press **`v`** to enter *select mode*: the mouse is
 released, `SELECT` shows in the footer, and you can drag to select and copy
 as usual (in tmux with `mouse on`, that's copy-on-release). Press `v` again

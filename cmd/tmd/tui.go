@@ -161,6 +161,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case tea.MouseMsg:
+		// In normal mode the wheel drives the cursor and the view follows
+		// (kept centered), so at either end of the document the marker
+		// walks to the first/last block, and scrolling back moves the
+		// marker to the middle before the view starts moving.
+		if m.mode == modeNormal && msg.Action == tea.MouseActionPress && !msg.Shift {
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				m.moveCursor(-m.vp.MouseWheelDelta)
+				m.compose()
+				m.centerCursor()
+				return m, nil
+			case tea.MouseButtonWheelDown:
+				m.moveCursor(m.vp.MouseWheelDelta)
+				m.compose()
+				m.centerCursor()
+				return m, nil
+			}
+		}
 		var cmd tea.Cmd
 		m.vp, cmd = m.vp.Update(msg)
 		if m.mode == modeNormal {
