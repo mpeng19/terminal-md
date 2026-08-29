@@ -23,16 +23,6 @@ const (
 	hScrollStep   = 4
 )
 
-var (
-	borderStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#A0A0A0", Dark: "#585858"})
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#5B3FBF", Dark: "#B39DFF"})
-	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#7A7A7A", Dark: "#8A8A8A"})
-	noticeStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#1F7A3F", Dark: "#7FD48A"})
-	errorStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#B42318", Dark: "#FF7B72"})
-	cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#5B3FBF", Dark: "#B39DFF"})
-	insertStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#1F7A3F", Dark: "#7FD48A"})
-)
-
 type mode int
 
 const (
@@ -65,6 +55,7 @@ type model struct {
 	src      source
 	opts     options
 	keys     keymap
+	th       theme
 	doc      document
 	savedSrc string    // document text as last loaded from / written to disk
 	mod      time.Time // last known modification time of src.path
@@ -102,8 +93,8 @@ type model struct {
 	noticeUntil time.Time
 }
 
-func newModel(src source, data []byte, opts options) model {
-	m := model{src: src, opts: opts, keys: defaultKeymap()}
+func newModel(src source, data []byte, opts options, th theme) model {
+	m := model{src: src, opts: opts, keys: defaultKeymap(), th: th}
 	m.doc = parseDocument(string(data))
 	m.savedSrc = m.doc.String()
 	if !src.isStdin() {
@@ -425,7 +416,7 @@ func (m *model) pushUndo() {
 // Editing
 // ---------------------------------------------------------------------------
 
-func newTextarea(width int) textarea.Model {
+func newTextarea(width int, placeholder lipgloss.Style) textarea.Model {
 	ta := textarea.New()
 	ta.Prompt = ""
 	ta.ShowLineNumbers = false
@@ -438,7 +429,7 @@ func newTextarea(width int) textarea.Model {
 	ta.FocusedStyle.CursorLine = plain
 	ta.FocusedStyle.Text = plain
 	ta.FocusedStyle.EndOfBuffer = plain
-	ta.FocusedStyle.Placeholder = dimStyle
+	ta.FocusedStyle.Placeholder = placeholder
 	ta.BlurredStyle = ta.FocusedStyle
 	ta.SetWidth(width)
 	return ta
@@ -449,7 +440,7 @@ func newTextarea(width int) textarea.Model {
 func (m *model) startEdit(i int, atEnd bool, before document) tea.Cmd {
 	m.preEdit = before
 	m.editIdx = i
-	m.ta = newTextarea(m.textW)
+	m.ta = newTextarea(m.textW, m.th.chrome.dim)
 	m.ta.SetValue(m.doc.blocks[i].src) // leaves the cursor at the end
 	if !atEnd {
 		// Land on the source line that corresponds to the cursor's position
@@ -633,7 +624,7 @@ func (m *model) layout() {
 	textW := max(m.vp.Width-2, 1) // cursor marker column + space
 	if textW != m.textW || m.renderer == nil {
 		m.textW = textW
-		m.renderer, m.renderErr = newRenderer(textW, m.opts.style)
+		m.renderer, m.renderErr = newRenderer(textW, m.th)
 		m.cache = map[string][]string{}
 		if m.mode == modeInsert {
 			m.ta.SetWidth(textW)
@@ -655,19 +646,19 @@ func (m *model) renderBlock(src string) []string {
 	}
 	var out string
 	if m.renderErr != nil {
-		out = errorStyle.Render("render error: " + m.renderErr.Error())
+		out = m.th.chrome.error.Render("render error: " + m.renderErr.Error())
 	} else if m.renderer != nil {
 		if s, err := m.renderer.Render(src); err == nil {
 			out = trimBlankLines(s)
 		} else {
-			out = errorStyle.Render("render error: " + err.Error())
+			out = m.th.chrome.error.Render("render error: " + err.Error())
 		}
 	}
 	var lines []string
 	if out == "" {
 		// Nothing visible (e.g. an HTML comment): show the source, dimmed.
 		for _, l := range strings.Split(src, "\n") {
-			lines = append(lines, dimStyle.Render(l))
+			lines = append(lines, m.th.chrome.dim.Render(l))
 		}
 	} else {
 		lines = strings.Split(out, "\n")
@@ -709,9 +700,9 @@ func (m *model) compose() {
 		mark := " "
 		switch {
 		case m.mode == modeInsert && i == m.editIdx:
-			mark = insertStyle.Render("▍")
+			mark = m.th.chrome.insert.Render("▍")
 		case m.mode == modeNormal && i == blk:
-			mark = cursorStyle.Render("▍")
+			mark = m.th.chrome.cursor.Render("▍")
 		}
 		m.blockStart[i] = len(lines)
 		m.blockLen[i] = len(bl)
@@ -868,14 +859,14 @@ func (m model) View() string {
 	}
 	if m.width < minBoxWidth || m.height < minBoxHeight {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			dimStyle.Render("terminal too small"))
+			m.th.chrome.dim.Render("terminal too small"))
 	}
 
 	inner := m.boxW - 2 // columns between the vertical borders
 	var b strings.Builder
 	b.WriteString(m.topBorder(inner))
 	b.WriteByte('\n')
-	side := borderStyle.Render("│")
+	side := m.th.chrome.border.Render("│")
 	for _, line := range strings.Split(m.vp.View(), "\n") {
 		b.WriteString(side)
 		b.WriteByte(' ')
@@ -903,9 +894,9 @@ func (m model) topBorder(inner int) string {
 	fill := inner - ansi.StringWidth(title)
 	if title != "" {
 		fill -= 4 // "─ " + " " + trailing "─"
-		return borderStyle.Render("╭─ ") + titleStyle.Render(title) + borderStyle.Render(" "+strings.Repeat("─", fill+1)+"╮")
+		return m.th.chrome.border.Render("╭─ ") + m.th.chrome.title.Render(title) + m.th.chrome.border.Render(" "+strings.Repeat("─", fill+1)+"╮")
 	}
-	return borderStyle.Render("╭" + strings.Repeat("─", fill) + "╮")
+	return m.th.chrome.border.Render("╭" + strings.Repeat("─", fill) + "╮")
 }
 
 // bottomBorder draws ╰─ 42% ──── hints ─╯ across inner columns.
@@ -917,27 +908,27 @@ func (m model) bottomBorder(inner int) string {
 		pct = fmt.Sprintf("%d%%", int(m.vp.ScrollPercent()*100+0.5))
 	}
 	left := "─ " + pct + " "
-	leftStyled := borderStyle.Render("─ ") + dimStyle.Render(pct) + borderStyle.Render(" ")
+	leftStyled := m.th.chrome.border.Render("─ ") + m.th.chrome.dim.Render(pct) + m.th.chrome.border.Render(" ")
 	if m.mode == modeInsert {
 		left = "─ INSERT · " + pct + " "
-		leftStyled = borderStyle.Render("─ ") + insertStyle.Render("INSERT") + borderStyle.Render(" · ") + dimStyle.Render(pct) + borderStyle.Render(" ")
+		leftStyled = m.th.chrome.border.Render("─ ") + m.th.chrome.insert.Render("INSERT") + m.th.chrome.border.Render(" · ") + m.th.chrome.dim.Render(pct) + m.th.chrome.border.Render(" ")
 	}
 
 	var right, rightStyled string
 	if m.notice != "" {
-		st := noticeStyle
+		st := m.th.chrome.notice
 		if m.noticeErr {
-			st = errorStyle
+			st = m.th.chrome.error
 		}
 		right = " " + m.notice + " ─"
-		rightStyled = " " + st.Render(m.notice) + borderStyle.Render(" ─")
+		rightStyled = " " + st.Render(m.notice) + m.th.chrome.border.Render(" ─")
 	} else {
 		hints := m.hints()
 		for len(hints) > 0 {
 			text := strings.Join(hints, " · ")
 			if ansi.StringWidth(left)+ansi.StringWidth(text)+3 <= inner {
 				right = " " + text + " ─"
-				rightStyled = " " + dimStyle.Render(text) + borderStyle.Render(" ─")
+				rightStyled = " " + m.th.chrome.dim.Render(text) + m.th.chrome.border.Render(" ─")
 				break
 			}
 			hints = hints[:len(hints)-1]
@@ -952,8 +943,8 @@ func (m model) bottomBorder(inner int) string {
 			fill = inner
 		}
 	}
-	return borderStyle.Render("╰") + leftStyled + borderStyle.Render(strings.Repeat("─", fill)) +
-		rightStyled + borderStyle.Render("╯")
+	return m.th.chrome.border.Render("╰") + leftStyled + m.th.chrome.border.Render(strings.Repeat("─", fill)) +
+		rightStyled + m.th.chrome.border.Render("╯")
 }
 
 // hints lists key hints for the footer, most important first.

@@ -51,8 +51,11 @@ tmd [options] <file.md>
 cat file.md | tmd
 
 Options:
-  -s, --style <name|path>  glamour style: auto, dark, light, dracula, notty,
-                           or a path to a glamour JSON style (default: auto)
+  -t, --theme <name|path>  color theme: dark, default, dracula, github,
+                           github-dark, github-light, light, notty, pink,
+                           tokyo-night, or a path to a glamour JSON style
+                           (default: auto — "default", matched to the
+                           terminal background)
       --size <fraction>    fraction of the terminal the box occupies (default: 0.75)
       --min-width <cols>   box is never narrower than this, unless the terminal
                            is (default: 100)
@@ -121,8 +124,16 @@ inside the editor split it into several blocks; an emptied block is removed.
   below 100×30 (`--min-width` / `--min-height`) so text stays readable in
   small windows — on an 80×24 terminal it simply fills the window. It
   re-lays-out and re-wraps when the terminal is resized.
-- **Style.** `auto` picks `dark` or `light` from the terminal's background
-  color. Set `GLAMOUR_STYLE` or pass `--style` to override.
+- **Themes.** `default` is glamour's dark/light style; `github` mimics
+  GitHub's markdown colors. Both pick their light or dark variant from the
+  terminal's background (set `GLAMOUR_STYLE=dark|light` if detection fails).
+  Pass `--theme` to choose another built-in, or a path to a
+  [glamour JSON style](https://github.com/charmbracelet/glamour/tree/master/styles)
+  for something custom.
+- **Headings.** A terminal can't change font size, so headings are shown
+  without their `#` markers and get their hierarchy from styling instead:
+  H1 is a highlighted block, H2 bold + underlined, H3 bold, H4 bold italic,
+  H5/H6 italic and muted.
 - **Piping.** When stdout is not a terminal (`tmd doc.md > out.txt`), the
   rendered Markdown is printed instead of opening the box, using the `notty`
   style unless one is given explicitly.

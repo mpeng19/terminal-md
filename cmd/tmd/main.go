@@ -28,7 +28,7 @@ const (
 
 // options are the command-line settings.
 type options struct {
-	style string  // glamour style name or path to a JSON style; "auto" = detect
+	style string  // theme name or path to a glamour JSON style; "auto" = detect
 	size  float64 // fraction of the terminal width/height the box occupies
 	minW  int     // lower bound on the box width, capped at the terminal width
 	minH  int     // lower bound on the box height, capped at the terminal height
@@ -65,16 +65,17 @@ func main() {
 
 	// Query the terminal background before Bubble Tea takes over the tty;
 	// this also warms lipgloss's cache so adaptive colors don't query later.
-	detected := detectStyle()
-	if opts.style == "auto" {
-		opts.style = detected
+	th, err := loadTheme(opts.style, detectDark())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tmd: %v\n", err)
+		os.Exit(1)
 	}
 
 	progOpts := []tea.ProgramOption{tea.WithAltScreen()}
 	if opts.mouse {
 		progOpts = append(progOpts, tea.WithMouseCellMotion())
 	}
-	if _, err := tea.NewProgram(newModel(src, data, opts), progOpts...).Run(); err != nil {
+	if _, err := tea.NewProgram(newModel(src, data, opts, th), progOpts...).Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "tmd: %v\n", err)
 		os.Exit(1)
 	}
@@ -92,8 +93,9 @@ Usage:
   cat file.md | tmd
 
 Options:
-  -s, --style <name|path>  glamour style: auto, dark, light, dracula, notty,
-                           or a path to a glamour JSON style (default: auto)
+  -t, --theme <name|path>  color theme: %s,
+                           or a path to a glamour JSON style (default: auto —
+                           "default", matched to the terminal background)
       --size <fraction>    fraction of the terminal the box occupies (default: %.2f)
       --min-width <cols>   box is never narrower than this, unless the terminal
                            is (default: %d)
@@ -111,7 +113,7 @@ Keys:
   dd        delete     u / ctrl+z  undo       ctrl+r    redo
   ctrl+s    save       q           quit
   In the editor: esc finishes, ctrl+s saves, ctrl+z / ctrl+r undo / redo.
-`, version, defaultSize, defaultMinWidth, defaultMinHeight)
+`, version, themeNames(), defaultSize, defaultMinWidth, defaultMinHeight)
 }
 
 // parseArgs handles flags in any position (before or after the file).
@@ -147,7 +149,7 @@ func parseArgs() (options, string) {
 			return args[i]
 		}
 		switch name {
-		case "s", "style":
+		case "t", "theme", "s", "style":
 			opts.style = needValue()
 		case "size":
 			raw := needValue()
@@ -219,60 +221,64 @@ func load(path string) (source, []byte, error) {
 	return source{path: path, label: path}, data, nil
 }
 
-// detectStyle picks a glamour style from the environment or the terminal's
-// background color.
-func detectStyle() string {
-	if s := os.Getenv("GLAMOUR_STYLE"); s != "" {
-		return s
+// detectDark reports whether the terminal has a dark background. GLAMOUR_STYLE
+// is honoured as an escape hatch for terminals that can't be queried.
+func detectDark() bool {
+	switch os.Getenv("GLAMOUR_STYLE") {
+	case "light":
+		return false
+	case "dark":
+		return true
 	}
-	if lipgloss.HasDarkBackground() {
-		return "dark"
-	}
-	return "light"
+	return lipgloss.HasDarkBackground()
 }
 
 // renderPlain writes the rendered markdown to stdout for non-terminal output.
 func renderPlain(data []byte, style string) error {
 	if style == "auto" {
-		style = os.Getenv("GLAMOUR_STYLE")
-		if style == "" {
-			style = "notty"
-		}
+		style = "notty"
+	}
+	th, err := loadTheme(style, true)
+	if err != nil {
+		return err
 	}
 	width := 80
 	if c, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && c > 0 {
 		width = c
 	}
-	out, err := renderMarkdown(data, width, style)
+	r, err := newRenderer(width, th)
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Println(out)
+	out, err := r.Render(string(data))
+	if err != nil {
+		return fmt.Errorf("rendering markdown: %w", err)
+	}
+	_, err = fmt.Println(strings.Trim(out, "\n"))
 	return err
 }
 
-// newRenderer builds a glamour renderer for the given wrap width and style.
-func newRenderer(width int, style string) (*glamour.TermRenderer, error) {
+// newRenderer builds a glamour renderer for the given wrap width and theme.
+func newRenderer(width int, th theme) (*glamour.TermRenderer, error) {
+	cfg := th.styles
+	// Horizontal rules span the available width instead of glamour's fixed
+	// "--------".
+	rule := "─"
+	if th.name == "notty" || th.name == "ascii" {
+		rule = "-"
+	}
+	margin := 0
+	if cfg.Document.Margin != nil {
+		margin = int(*cfg.Document.Margin)
+	}
+	cfg.HorizontalRule.Format = "\n" + strings.Repeat(rule, max(width-2*margin, 1)) + "\n"
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStylePath(style),
+		glamour.WithStyles(cfg),
 		glamour.WithWordWrap(width),
 		glamour.WithEmoji(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("style %q: %w", style, err)
+		return nil, fmt.Errorf("theme %q: %w", th.name, err)
 	}
 	return r, nil
-}
-
-// renderMarkdown renders markdown to ANSI text wrapped at width.
-func renderMarkdown(data []byte, width int, style string) (string, error) {
-	r, err := newRenderer(width, style)
-	if err != nil {
-		return "", err
-	}
-	out, err := r.Render(string(data))
-	if err != nil {
-		return "", fmt.Errorf("rendering markdown: %w", err)
-	}
-	return strings.Trim(out, "\n"), nil
 }
