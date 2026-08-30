@@ -12,19 +12,7 @@ width and height by default, filling more of it on small windows), renders the M
 on screen when you quit — it uses the alternate screen buffer, so your
 scrollback and prompt come back untouched.
 
-```
-            ╭─ examples/demo.md ─────────────────────────────╮
-            │                                                │
-            │    terminal-md demo                            │
-            │                                                │
-            │   A quick tour of what  tmd  renders. Scroll   │
-            │   with j/k or the arrow keys, jump with g/G,   │
-            │   and press q to leave.                        │
-            │                                                │
-            │   ## Text                                      │
-            │                                                │
-            ╰─ 0% ──── ↑↓ scroll · g/G top/end · q quit ─────╯
-```
+![terminal md example](examples/image.png)
 
 ## Install
 
